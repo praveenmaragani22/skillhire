@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Applications | SkillHire</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">⚡</div>
+        <span class="logo-text">SkillHire</span>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar">👤</div>
+      <div class="user-name">{{ user["name"] }}</div>
+      <div class="user-role">{{ user.get("job_fit", "Job Seeker") }}</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/dashboard" class="nav-item"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="/resume_analyzer" class="nav-item"><span class="nav-icon">📄</span> Resume Analyzer</a>
+      <a href="/job_matches" class="nav-item"><span class="nav-icon">🎯</span> Job Matches <span class="nav-badge">New</span></a>
+      <div class="nav-section-label">Growth</div>
+      <a href="/skill_gap" class="nav-item"><span class="nav-icon">📊</span> Skill Gap</a>
+      <a href="/interviews" class="nav-item"><span class="nav-icon">🎤</span> Interview Prep</a>
+      <div class="nav-section-label">Track</div>
+      <a href="/applications" class="nav-item active"><span class="nav-icon">📋</span> Applications</a>
+      <a href="/settings" class="nav-item"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="nav-item" style="color: #f87171;"><span class="nav-icon">🚪</span> Sign Out</a>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <div class="topbar">
+      <span class="page-title">Applications Tracker</span>
+      <div class="topbar-right">
+        <button class="topbar-btn" onclick="document.getElementById('addModal').style.display='flex'">+ Add Application</button>
+        <button class="topbar-btn">🔔</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- STATS -->
+      <div class="stats-grid" style="margin-bottom: 24px;">
+        {% set counts = {'applied': 0, 'interview': 0, 'offer': 0, 'rejected': 0} %}
+        {% for app in applications %}
+          {% if app.status in counts %}
+            {% set _ = counts.update({app.status: counts[app.status] + 1}) %}
+          {% endif %}
+        {% endfor %}
+        <div class="stat-card indigo">
+          <div class="stat-top"><span class="stat-icon">📤</span></div>
+          <div class="stat-value">{{ applications | length }}</div>
+          <div class="stat-label">Total Applied</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-top"><span class="stat-icon">🗓️</span></div>
+          <div class="stat-value">{{ counts.interview }}</div>
+          <div class="stat-label">Interviews</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-top"><span class="stat-icon">🎉</span></div>
+          <div class="stat-value">{{ counts.offer }}</div>
+          <div class="stat-label">Offers</div>
+        </div>
+        <div class="stat-card pink">
+          <div class="stat-top"><span class="stat-icon">❌</span></div>
+          <div class="stat-value">{{ counts.rejected }}</div>
+          <div class="stat-label">Rejected</div>
+        </div>
+      </div>
+
+      <div class="content-grid-3">
+        <!-- TABLE -->
+        <div class="card">
+          <div class="section-header" style="margin-bottom: 16px;">
+            <span class="section-title">📋 All Applications</span>
+          </div>
+          {% if applications %}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Job Title</th>
+                <th>Company</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for app in applications %}
+              <tr>
+                <td style="color: var(--text); font-weight: 600;">{{ app.job_title }}</td>
+                <td>{{ app.company }}</td>
+                <td><span class="badge badge-saved">{{ app.get("job_type", "—") }}</span></td>
+                <td>
+                  <span class="badge badge-{{ app.status }}">
+                    {{ app.status | capitalize }}
+                  </span>
+                </td>
+                <td>{{ app.applied_date }}</td>
+                <td>
+                  <form method="POST" action="/update_application" style="display: flex; gap: 6px; align-items: center;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="app_id" value="{{ app._id }}">
+                    <select name="new_status" class="form-select" style="padding: 4px 8px; font-size: 12px; width: auto;">
+                      {% for s in ['applied', 'interview', 'offer', 'rejected'] %}
+                        <option value="{{ s }}" {{ 'selected' if app.status == s else '' }}>{{ s | capitalize }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-primary" style="padding: 5px 10px; font-size: 11px;">Update</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <div class="empty-title">No Applications Yet</div>
+            <div class="empty-text">Apply to jobs from the Job Matches page or add one manually</div>
+            <a href="/job_matches" class="btn-primary">Browse Jobs</a>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- MINI CHART -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom: 16px;">📊 Status Breakdown</div>
+          {% if applications %}
+          <canvas id="appChart" style="max-height: 220px;"></canvas>
+          <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+            {% for status, color, emoji in [('applied','#6366f1','📤'), ('interview','#fbbf24','🗓️'), ('offer','#34d399','🎉'), ('rejected','#f87171','❌')] %}
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 13px;">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: {{ color }}; flex-shrink: 0;"></span>
+              <span style="color: var(--muted2);">{{ emoji }} {{ status | capitalize }}</span>
+              <span style="margin-left: auto; font-weight: 700; color: var(--text);">
+                {{ applications | selectattr("status", "equalto", status) | list | length }}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="empty-state" style="padding: 30px 0;">
+            <div class="empty-icon">📊</div>
+            <div class="empty-text">Chart will appear once you have applications</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ADD APPLICATION MODAL -->
+<div id="addModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center;">
+  <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 440px; max-width: 90vw;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+      <div style="font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700;">Add Application</div>
+      <button onclick="document.getElementById('addModal').style.display='none'" style="background: none; border: none; color: var(--muted2); font-size: 20px; cursor: pointer;">×</button>
+    </div>
+    <form method="POST" action="/add_application">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Job Title</label>
+        <input type="text" name="job_title" class="form-input" placeholder="e.g. Backend Developer" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Company</label>
+        <input type="text" name="company" class="form-input" placeholder="e.g. TechCorp India" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Job Type</label>
+        <select name="job_type" class="form-select">
+          <option>Full-time</option>
+          <option>Remote</option>
+          <option>Hybrid</option>
+          <option>Internship</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select">
+          <option value="applied">Applied</option>
+          <option value="interview">Interview</option>
+          <option value="offer">Offer</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 8px;">Add Application</button>
+    </form>
+  </div>
+</div>
+
+<script>
+{% if applications %}
+const appCtx = document.getElementById('appChart').getContext('2d');
+new Chart(appCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Applied', 'Interview', 'Offer', 'Rejected'],
+    datasets: [{
+      data: [
+        {{ applications | selectattr("status", "equalto", "applied") | list | length }},
+        {{ applications | selectattr("status", "equalto", "interview") | list | length }},
+        {{ applications | selectattr("status", "equalto", "offer") | list | length }},
+        {{ applications | selectattr("status", "equalto", "rejected") | list | length }}
+      ],
+      backgroundColor: ['#6366f1', '#fbbf24', '#34d399', '#f87171'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    plugins: {
+      legend: { display: false }
+    },
+    cutout: '65%'
+  }
+});
+{% endif %}
+</script>
+</body>
+</html>

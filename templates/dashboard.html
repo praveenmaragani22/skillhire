@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard | SkillHire</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">⚡</div>
+        <span class="logo-text">SkillHire</span>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar">👤</div>
+      <div class="user-name">{{ user["name"] }}</div>
+      <div class="user-role">{{ user.get("job_fit", "Job Seeker") }}</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/dashboard" class="nav-item active"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="/resume_analyzer" class="nav-item"><span class="nav-icon">📄</span> Resume Analyzer</a>
+      <a href="/job_matches" class="nav-item"><span class="nav-icon">🎯</span> Job Matches</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="/skill_gap" class="nav-item"><span class="nav-icon">📊</span> Skill Gap</a>
+      <a href="/interviews" class="nav-item"><span class="nav-icon">🎤</span> Interview Prep</a>
+      <div class="nav-section-label">Track</div>
+      <a href="/applications" class="nav-item">
+        <span class="nav-icon">📋</span> Applications
+        {% if total_applications > 0 %}<span class="nav-badge">{{ total_applications }}</span>{% endif %}
+      </a>
+      <a href="/settings" class="nav-item"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="nav-item" style="color: #f87171;"><span class="nav-icon">🚪</span> Sign Out</a>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <div class="topbar">
+      <span class="page-title">Dashboard</span>
+      <div class="topbar-search">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="Search jobs, skills, companies..." />
+      </div>
+      <div class="topbar-right">
+        <span style="font-size: 12px; color: var(--muted2);">{{ now }}</span>
+        <button class="topbar-btn">🔔</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- HERO — all real-time from DB -->
+      <div class="dash-hero">
+        <div class="hero-content">
+          <div class="hero-greeting">👋 {{ greeting }}, {{ user["name"].split()[0] }}</div>
+          {% if user["resume_uploaded"] %}
+            <h1 class="hero-title">ATS Score: <span style="color:{{ user.get('ats_color','var(--accent2)') }}">{{ user["resume_score"] }}/100</span> — <span>{{ user.get('ats_grade','Upload Resume') }}</span></h1>
+            <p class="hero-subtitle">
+              {{ user["skills"]|length }} skills detected &nbsp;·&nbsp;
+              {{ user["missing_skills"]|length }} core gaps &nbsp;·&nbsp;
+              {{ user.get("ai_era_gaps", [])|length }} AI-era gaps &nbsp;·&nbsp;
+              {{ total_applications }} job{{ 's' if total_applications != 1 else '' }} applied
+            </p>
+            <div class="hero-progress-wrap">
+              <div class="progress-label">
+                <span>Job Readiness Score</span>
+                <span>{{ user["resume_score"] }}/100</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="heroBar" style="width:0%;"></div>
+              </div>
+            </div>
+          {% else %}
+            <h1 class="hero-title">Welcome, <span>{{ user["name"].split()[0] }}</span>!</h1>
+            <p class="hero-subtitle">Upload your resume to unlock your personalized job dashboard</p>
+          {% endif %}
+          <div class="hero-actions-row">
+            <a href="/upload_resume" class="btn-primary">📄 {{ 'Update Resume' if user['resume_uploaded'] else 'Upload Resume' }}</a>
+            {% if user["resume_uploaded"] %}
+              <a href="/job_matches" class="btn-secondary">🎯 Job Matches</a>
+              <a href="/interviews" class="btn-secondary">🎤 Practice</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- REAL-TIME STAT CARDS -->
+      <div class="stats-grid">
+        <div class="stat-card indigo">
+          <div class="stat-top">
+            <span class="stat-icon">📄</span>
+            <span class="stat-trend {{ 'up' if user['resume_uploaded'] else 'neutral' }}">{{ 'Active' if user['resume_uploaded'] else 'Pending' }}</span>
+          </div>
+          <div class="stat-value" id="scoreVal">0</div>
+          <div class="stat-label">Resume Score / 100</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-top"><span class="stat-icon">🧠</span><span class="stat-trend up">Found</span></div>
+          <div class="stat-value" id="skillsVal">0</div>
+          <div class="stat-label">Skills Detected</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-top">
+            <span class="stat-icon">📋</span>
+            <span class="stat-trend {{ 'up' if total_applications > 0 else 'neutral' }}">{{ 'Tracking' if total_applications > 0 else 'None yet' }}</span>
+          </div>
+          <div class="stat-value" id="appsVal">0</div>
+          <div class="stat-label">Jobs Applied</div>
+        </div>
+        <div class="stat-card pink">
+          <div class="stat-top"><span class="stat-icon">🎤</span><span class="stat-trend neutral">Prep</span></div>
+          <div class="stat-value" id="practiceVal">0</div>
+          <div class="stat-label">Questions Practiced</div>
+        </div>
+      </div>
+
+      <!-- APPLICATION STATUS — real from DB -->
+      {% if total_applications > 0 %}
+      <div class="card" style="margin-bottom:28px;">
+        <div class="section-header">
+          <span class="section-title">📊 Application Status Tracker</span>
+          <a href="/applications" class="section-link">Manage all →</a>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px;">
+          {% for status, color, emoji, label in [('applied','#6366f1','📤','Applied'),('interview','#fbbf24','🗓️','Interview'),('offer','#34d399','🎉','Offer'),('rejected','#f87171','❌','Rejected')] %}
+          <div style="background:var(--surface2); border-radius:12px; padding:16px; text-align:center; border:1px solid var(--border);">
+            <div style="font-size:22px; margin-bottom:6px;">{{ emoji }}</div>
+            <div style="font-family:'Syne',sans-serif; font-size:24px; font-weight:800; color:{{ color }};">{{ app_counts.get(status,0) }}</div>
+            <div style="font-size:12px; color:var(--muted2); margin-top:2px;">{{ label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        <div style="margin-top:14px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted2); margin-bottom:6px;">
+            <span>Interview Conversion Rate</span>
+            <span>{{ ((app_counts.get('interview',0)+app_counts.get('offer',0))/total_applications*100)|int }}%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width:{{ ((app_counts.get('interview',0)+app_counts.get('offer',0))/total_applications*100)|int }}%; background:linear-gradient(90deg,#fbbf24,#34d399);"></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="content-grid">
+        <!-- SKILLS -->
+        <div class="card">
+          <div class="section-header">
+            <span class="section-title">🧠 Your Skills</span>
+            <a href="/skill_gap" class="section-link">Gap analysis →</a>
+          </div>
+          {% if user["resume_uploaded"] %}
+            <div class="skill-tags">
+              {% for skill in user["skills"] %}
+                <span class="skill-tag strong">✓ {{ skill }}</span>
+              {% else %}
+                <span style="color:var(--muted);font-size:14px;">No skills extracted yet</span>
+              {% endfor %}
+            </div>
+            {% if user["missing_skills"] or user.get("ai_era_gaps") %}
+            <div style="margin-top:16px;">
+              <!-- Role Readiness Bar -->
+              {% if user.get("readiness") %}
+              <div style="margin-bottom:14px; padding:12px 14px; background:var(--surface); border-radius:10px; border:1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <span style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.08em;">ROLE READINESS — {{ user.get("selected_role", user["job_fit"]) }}</span>
+                  <span style="font-size:14px; font-weight:800; color:{% if user['readiness'] >= 70 %}var(--success){% elif user['readiness'] >= 40 %}var(--warning){% else %}var(--danger){% endif %};">{{ user["readiness"] }}%</span>
+                </div>
+                <div class="skill-bar-track">
+                  <div style="height:100%; border-radius:20px; width:{{ user['readiness'] }}%;
+                    background:{% if user['readiness'] >= 70 %}linear-gradient(90deg,#34d399,#6ee7b7){% elif user['readiness'] >= 40 %}linear-gradient(90deg,#fbbf24,#fde68a){% else %}linear-gradient(90deg,#f87171,#fca5a5){% endif %};"></div>
+                </div>
+              </div>
+              {% endif %}
+
+              <!-- Core Missing Skills -->
+              {% if user["missing_skills"] %}
+              <div style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.08em; margin-bottom:8px;">CORE SKILLS TO LEARN</div>
+              <div class="skill-tags" style="margin-bottom:12px;">
+                {% for skill in user["missing_skills"] %}
+                  <span class="skill-tag missing">⚡ {{ skill }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+
+              <!-- AI-Era Gaps -->
+              {% if user.get("ai_era_gaps") %}
+              <div style="font-size:11px; color:#a78bfa; font-weight:700; letter-spacing:0.08em; margin-bottom:8px;">🤖 AI-ERA SKILLS NEEDED</div>
+              <div class="skill-tags">
+                {% for skill in user["ai_era_gaps"] %}
+                  <span style="display:inline-flex; align-items:center; gap:4px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.35); color:#a78bfa; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px; margin:2px;">🚀 {{ skill }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if user["skills"] %}
+            <div style="margin-top:20px;">
+              <div style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.08em; margin-bottom:12px;">SKILL LEVELS</div>
+              {% for i in range([user["skills"]|length,6]|min) %}
+              <div class="skill-bar-item">
+                <div class="skill-bar-header">
+                  <span>{{ user["skills"][i] }}</span>
+                  <span>{{ user["skill_levels"][i] if user.get("skill_levels") and i < user["skill_levels"]|length else 70 }}%</span>
+                </div>
+                <div class="skill-bar-track">
+                  <div class="skill-bar-fill" style="width:{{ user['skill_levels'][i] if user.get('skill_levels') and i < user['skill_levels']|length else 70 }}%;"></div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          {% else %}
+            <div class="empty-state">
+              <div class="empty-icon">📋</div>
+              <div class="empty-title">No Resume Yet</div>
+              <div class="empty-text">Upload your resume to extract skills automatically</div>
+              <a href="/upload_resume" class="btn-primary" style="margin-top:12px;">Upload Now</a>
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- JOURNEY -->
+        <div class="card">
+          <div class="section-header"><span class="section-title">📅 Your Journey</span></div>
+          <div style="margin-top:8px;">
+            <div class="activity-item">
+              <div class="activity-dot done">✓</div>
+              <div>
+                <div class="activity-text"><strong>Account Created</strong></div>
+                <div class="activity-time">Welcome to SkillHire!</div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot {{ 'done' if user['resume_uploaded'] else 'pending' }}">{{ '✓' if user['resume_uploaded'] else '2' }}</div>
+              <div>
+                <div class="activity-text"><strong>Resume Upload</strong> — {{ 'Done ✅' if user['resume_uploaded'] else 'Pending' }}</div>
+                <div class="activity-time">{{ user['skills']|length|string + ' skills extracted' if user['resume_uploaded'] else 'Upload your resume to continue' }}</div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot {{ 'done' if total_applications > 0 else 'pending' }}">{{ '✓' if total_applications > 0 else '3' }}</div>
+              <div>
+                <div class="activity-text"><strong>Jobs Applied — {{ total_applications }}</strong></div>
+                <div class="activity-time">
+                  {% if total_applications > 0 %}{{ app_counts.get('interview',0) }} interviews · {{ app_counts.get('offer',0) }} offers
+                  {% else %}Browse job matches and apply{% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot {{ 'active' if user.get('interview_practiced',0) > 0 else 'pending' }}">{{ '✓' if user.get('interview_practiced',0) >= 5 else '4' }}</div>
+              <div>
+                <div class="activity-text"><strong>Interview Prep — {{ user.get('interview_practiced',0) }} done</strong></div>
+                <div class="activity-time">Practice role-specific questions</div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot {{ 'done' if app_counts.get('offer',0) > 0 else 'pending' }}">{{ '🎉' if app_counts.get('offer',0) > 0 else '5' }}</div>
+              <div>
+                <div class="activity-text"><strong>Get Offer {{ '— ' + app_counts.get('offer',0)|string + ' received! 🎉' if app_counts.get('offer',0) > 0 else '' }}</strong></div>
+                <div class="activity-time">{{ 'Congratulations!' if app_counts.get('offer',0) > 0 else 'The final goal!' }}</div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:20px; padding-top:18px; border-top:1px solid var(--border);">
+            <div style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.08em; margin-bottom:12px;">QUICK ACTIONS</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <a href="/resume_analyzer" class="btn-ghost">📄 Analyze Resume</a>
+              <a href="/job_matches" class="btn-ghost">🎯 Browse Jobs</a>
+              <a href="/interviews" class="btn-ghost">🎤 Practice Interview</a>
+              <a href="/skill_gap" class="btn-ghost">📊 Check Skill Gap</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TOP JOB MATCHES — dynamic, based on user skills -->
+      {% if user["resume_uploaded"] and top_jobs %}
+      <div class="card" style="margin-bottom:28px;">
+        <div class="section-header">
+          <span class="section-title">🎯 Top Job Matches for You</span>
+          <a href="/job_matches" class="section-link">View all →</a>
+        </div>
+        <div style="margin-top:8px;">
+          {% for job in top_jobs %}
+          <div class="job-card">
+            <div class="job-logo">{{ job.emoji }}</div>
+            <div class="job-info">
+              <div class="job-title">{{ job.title }}</div>
+              <div class="job-company">{{ job.company }} · {{ job.location }}</div>
+              <div class="job-meta">
+                <span class="job-tag">{{ job.type }}</span>
+                <span style="font-size:12px; color:var(--accent2); font-weight:600;">{{ job.salary }}</span>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+              <div class="job-match">{{ job.match }}%</div>
+              <a href="{{ job.apply_url }}" target="_blank" class="btn-primary" style="padding:5px 12px; font-size:11px;">Apply →</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+function animateCount(id, target, duration=1200) {
+  const el = document.getElementById(id);
+  if (!el || target === 0) { if(el) el.textContent = '0'; return; }
+  let start = 0;
+  const step = target / (duration / 16);
+  const timer = setInterval(() => {
+    start = Math.min(start + step, target);
+    el.textContent = Math.floor(start);
+    if (start >= target) clearInterval(timer);
+  }, 16);
+}
+animateCount('scoreVal', {{ user["resume_score"] }});
+animateCount('skillsVal', {{ user["skills"]|length }});
+animateCount('appsVal', {{ total_applications }});
+animateCount('practiceVal', {{ user.get("interview_practiced", 0) }});
+
+// Animate hero progress bar
+setTimeout(() => {
+  const bar = document.getElementById('heroBar');
+  if (bar) { bar.style.transition = 'width 1.3s ease'; bar.style.width = '{{ user["resume_score"] }}%'; }
+}, 200);
+</script>
+</body>
+</html>

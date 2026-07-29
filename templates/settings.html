@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Settings | SkillHire</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">⚡</div>
+        <span class="logo-text">SkillHire</span>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar">👤</div>
+      <div class="user-name">{{ user["name"] }}</div>
+      <div class="user-role">{{ user.get("job_fit", "Job Seeker") }}</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/dashboard" class="nav-item"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="/resume_analyzer" class="nav-item"><span class="nav-icon">📄</span> Resume Analyzer</a>
+      <a href="/job_matches" class="nav-item"><span class="nav-icon">🎯</span> Job Matches <span class="nav-badge">New</span></a>
+      <div class="nav-section-label">Growth</div>
+      <a href="/skill_gap" class="nav-item"><span class="nav-icon">📊</span> Skill Gap</a>
+      <a href="/interviews" class="nav-item"><span class="nav-icon">🎤</span> Interview Prep</a>
+      <div class="nav-section-label">Track</div>
+      <a href="/applications" class="nav-item"><span class="nav-icon">📋</span> Applications</a>
+      <a href="/settings" class="nav-item active"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="nav-item" style="color: #f87171;"><span class="nav-icon">🚪</span> Sign Out</a>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <div class="topbar">
+      <span class="page-title">Settings</span>
+      <div class="topbar-right">
+        <button class="topbar-btn">🔔</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="flash flash-{{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <div style="max-width: 700px;">
+
+        <!-- PROFILE SETTINGS -->
+        <div class="settings-section">
+          <div class="settings-section-title">👤 Profile Information</div>
+          <div style="display: flex; align-items: flex-start; gap: 20px; margin-bottom: 24px;">
+            <div class="profile-avatar-big">👤</div>
+            <div>
+              <div style="font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700;">{{ user["name"] }}</div>
+              <div style="font-size: 14px; color: var(--muted2); margin-top: 4px;">{{ user["email"] }}</div>
+              <div style="font-size: 13px; color: var(--accent2); margin-top: 6px;">{{ user.get("job_fit", "Job Seeker") }}</div>
+            </div>
+          </div>
+          <form method="POST" action="/settings/profile">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="name" class="form-input" value="{{ user['name'] }}" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" name="email" class="form-input" value="{{ user['email'] }}" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Job Role</label>
+              <select name="target_role" class="form-select">
+                {% for role in ['Backend Developer', 'Full Stack Engineer', 'Frontend Developer', 'Data Scientist', 'DevOps Engineer', 'ML Engineer'] %}
+                  <option value="{{ role }}" {{ 'selected' if user.get('job_fit') == role else '' }}>{{ role }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Bio / About</label>
+              <textarea name="bio" class="form-input" rows="3" placeholder="Tell us about yourself...">{{ user.get("bio", "") }}</textarea>
+            </div>
+            <button type="submit" class="btn-primary">Save Profile</button>
+          </form>
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="settings-section">
+          <div class="settings-section-title">🔒 Change Password</div>
+          <form method="POST" action="/settings/password">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+              <label class="form-label">Current Password</label>
+              <input type="password" name="current_password" class="form-input" placeholder="Enter current password">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="form-group">
+                <label class="form-label">New Password</label>
+                <input type="password" name="new_password" class="form-input" placeholder="Min 8 characters">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Confirm New Password</label>
+                <input type="password" name="confirm_password" class="form-input" placeholder="Repeat new password">
+              </div>
+            </div>
+            <button type="submit" class="btn-primary">Update Password</button>
+          </form>
+        </div>
+
+        <!-- NOTIFICATIONS -->
+        <div class="settings-section">
+          <div class="settings-section-title">🔔 Notifications</div>
+          {% set notif_settings = [
+            ('job_alerts', 'Job Match Alerts', 'Get notified when new jobs match your skills'),
+            ('skill_tips', 'Skill Improvement Tips', 'Weekly tips on skills to improve'),
+            ('interview_reminders', 'Interview Reminders', 'Reminders before scheduled interviews'),
+            ('application_updates', 'Application Updates', 'Status changes on your applications')
+          ] %}
+          {% for key, title, desc in notif_settings %}
+          <form method="POST" action="/settings/toggle" style="display: contents;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="setting_key" value="{{ key }}">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="toggle-title">{{ title }}</div>
+                <div class="toggle-desc">{{ desc }}</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" {{ 'checked' if user.get(key, True) else '' }} onchange="this.closest('form').submit()">
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+          </form>
+          {% endfor %}
+        </div>
+
+        <!-- JOB PREFERENCES -->
+        <div class="settings-section">
+          <div class="settings-section-title">🎯 Job Preferences</div>
+          <form method="POST" action="/settings/preferences">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Preferred Location</label>
+                <input type="text" name="preferred_location" class="form-input" value="{{ user.get('preferred_location', '') }}" placeholder="e.g. Hyderabad, Remote">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Expected Salary (LPA)</label>
+                <input type="text" name="expected_salary" class="form-input" value="{{ user.get('expected_salary', '') }}" placeholder="e.g. 8-12 LPA">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Preferred Job Type</label>
+              <select name="preferred_job_type" class="form-select">
+                {% for jt in ['Any', 'Full-time', 'Remote', 'Hybrid', 'Internship'] %}
+                  <option {{ 'selected' if user.get('preferred_job_type') == jt else '' }}>{{ jt }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit" class="btn-primary">Save Preferences</button>
+          </form>
+        </div>
+
+        <!-- DANGER ZONE -->
+        <div class="settings-section" style="border-color: rgba(248,113,113,0.3);">
+          <div class="settings-section-title" style="color: var(--danger);">⚠️ Danger Zone</div>
+          <div class="alert alert-warn" style="margin-bottom: 16px;">
+            These actions are irreversible. Please be careful.
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <form method="POST" action="/delete_resume">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-ghost" style="border-color: var(--warning); color: var(--warning);" onclick="return confirm('Delete your resume and all extracted data?')">🗑 Delete Resume Data</button>
+            </form>
+            <form method="POST" action="/delete_account">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-ghost" style="border-color: var(--danger); color: var(--danger);" onclick="return confirm('Permanently delete your account? This cannot be undone.')">❌ Delete Account</button>
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

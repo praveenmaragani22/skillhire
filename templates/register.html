@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account | SkillHire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg: #f0f4ff; --surface: #ffffff; --border: #e2e8f0;
+      --text: #0f172a; --muted: #64748b; --accent: #4f46e5;
+      --input-bg: #f8fafc; --input-border: #cbd5e1;
+    }
+    body.dark-mode {
+      --bg: #0f172a; --surface: #1e293b; --border: #334155;
+      --text: #f1f5f9; --muted: #94a3b8; --accent: #6366f1;
+      --input-bg: #0f172a; --input-border: #475569;
+    }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg);
+      color: var(--text); min-height: 100vh; display: flex; transition: background 0.3s, color 0.3s;
+    }
+    .theme-toggle-btn {
+      position: fixed; top: 20px; right: 20px; z-index: 999;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 50px;
+      padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--text);
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08); transition: all 0.2s;
+    }
+    .theme-toggle-btn:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.15); transform: translateY(-1px); }
+
+    /* RIGHT panel first on register for variety */
+    .auth-wrapper { display: flex; width: 100%; min-height: 100vh; }
+
+    .auth-right {
+      width: 40%;
+      background: linear-gradient(145deg, #064e3b, #0f766e, #14b8a6);
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      padding: 60px 50px; position: relative; overflow: hidden; color: white;
+    }
+    .auth-right::before {
+      content:''; position:absolute; top:-80px; left:-80px;
+      width:300px; height:300px; border-radius:50%; background:rgba(255,255,255,0.07);
+    }
+    .auth-right::after {
+      content:''; position:absolute; bottom:-60px; right:-60px;
+      width:240px; height:240px; border-radius:50%; background:rgba(255,255,255,0.05);
+    }
+    .right-content { position:relative; z-index:1; text-align:center; max-width:300px; }
+    .right-icon { font-size:60px; margin-bottom:20px; }
+    .right-content h2 { font-size:26px; font-weight:800; margin-bottom:12px; line-height:1.3; }
+    .right-content p { font-size:14px; color:rgba(255,255,255,0.85); line-height:1.7; margin-bottom:28px; }
+
+    .steps-list { list-style:none; text-align:left; }
+    .steps-list li {
+      display:flex; align-items:center; gap:14px;
+      padding:11px 0; font-size:14px; color:rgba(255,255,255,0.92);
+      border-bottom:1px solid rgba(255,255,255,0.12);
+    }
+    .steps-list li:last-child { border-bottom:none; }
+    .step-num {
+      width:28px; height:28px; background:rgba(255,255,255,0.22); border-radius:50%;
+      display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;
+    }
+
+    .auth-left {
+      flex: 1; display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      padding: 50px 40px; background: var(--surface);
+    }
+    .auth-form-box { width: 100%; max-width: 420px; }
+
+    .brand-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 36px; }
+    .brand-logo .logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, #0f766e, #14b8a6);
+      border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .brand-logo .logo-name { font-size: 20px; font-weight: 800; color: #0f766e; }
+    body.dark-mode .brand-logo .logo-name { color: #14b8a6; }
+
+    .auth-form-box h1 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+    .auth-form-box .sub-text { font-size: 14px; color: var(--muted); margin-bottom: 26px; }
+    .auth-form-box .sub-text a { color: #0f766e; font-weight: 600; text-decoration: none; }
+    body.dark-mode .auth-form-box .sub-text a { color: #14b8a6; }
+    .auth-form-box .sub-text a:hover { text-decoration: underline; }
+
+    .flash-msg {
+      padding: 12px 16px; border-radius: 10px; font-size: 13px;
+      font-weight: 500; margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
+    }
+    .flash-error { background: #fef2f2; color: #dc2626; border: 1px solid rgba(220,38,38,0.2); }
+    .flash-success { background: #f0fdf4; color: #16a34a; border: 1px solid rgba(22,163,74,0.2); }
+    body.dark-mode .flash-error { background: rgba(220,38,38,0.1); color: #f87171; }
+    body.dark-mode .flash-success { background: rgba(22,163,74,0.1); color: #4ade80; }
+
+    /* Two-column row */
+    .form-row-2 { display: flex; gap: 14px; }
+    .form-row-2 .form-group { flex: 1; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .input-wrapper { position: relative; }
+    .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; pointer-events: none; opacity: 0.5; }
+    .form-group input {
+      width: 100%; padding: 12px 14px 12px 42px;
+      border: 1.5px solid var(--input-border); border-radius: 10px;
+      background: var(--input-bg); color: var(--text);
+      font-size: 14px; font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+    }
+    .form-group input:focus { border-color: #0f766e; box-shadow: 0 0 0 3px rgba(15,118,110,0.12); }
+    body.dark-mode .form-group input:focus { border-color: #14b8a6; box-shadow: 0 0 0 3px rgba(20,184,166,0.15); }
+    .form-group input::placeholder { color: var(--muted); }
+    .pwd-eye {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 16px; color: var(--muted); padding:0;
+    }
+
+    /* Password strength */
+    .pwd-strength { margin-top: 6px; }
+    .pwd-bar-wrap { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .pwd-bar { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; width: 0%; }
+    .pwd-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    .terms-text { font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; line-height: 1.5; }
+    .terms-text a { color: #0f766e; font-weight: 600; text-decoration: none; }
+
+    .btn-submit {
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, #0f766e, #14b8a6);
+      color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+      font-family: 'Inter', sans-serif; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 4px 15px rgba(15,118,110,0.35); margin-top: 20px;
+    }
+    .btn-submit:hover {
+      background: linear-gradient(135deg, #0d6560, #0f766e);
+      transform: translateY(-1px); box-shadow: 0 6px 20px rgba(15,118,110,0.45);
+    }
+
+    @media (max-width: 768px) {
+      .auth-right { display:none; }
+      .auth-left { width:100%; padding:40px 24px; }
+      .form-row-2 { flex-direction: column; gap: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">🌙 Dark Mode</button>
+
+<div class="auth-wrapper">
+
+  <!-- LEFT: GRADIENT PANEL -->
+  <div class="auth-right">
+    <div class="right-content">
+      <div class="right-icon">🚀</div>
+      <h2>Start Your Skill Journey</h2>
+      <p>Join thousands of freshers and students getting hired through skill-based matching.</p>
+      <ul class="steps-list">
+        <li><span class="step-num">1</span> Create your free account</li>
+        <li><span class="step-num">2</span> Upload your resume for AI analysis</li>
+        <li><span class="step-num">3</span> Discover skill gaps & job matches</li>
+        <li><span class="step-num">4</span> Practice with AI interview simulator</li>
+        <li><span class="step-num">5</span> Apply to matching jobs instantly</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- RIGHT: FORM -->
+  <div class="auth-left">
+    <div class="auth-form-box">
+
+      <div class="brand-logo">
+        <div class="logo-icon">⚡</div>
+        <span class="logo-name">SkillHire</span>
+      </div>
+
+      <h1>Create Your Account ✨</h1>
+      <p class="sub-text">Already have an account? <a href="/login">Sign in →</a></p>
+
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% for category, message in messages %}
+          <div class="flash-msg flash-{{ category }}">
+            {{ '❌' if category == 'error' else '✅' }} {{ message }}
+          </div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="/register" id="regForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+          <label>Full Name</label>
+          <div class="input-wrapper">
+            <span class="input-icon">👤</span>
+            <input type="text" name="name" placeholder="e.g. Praveen Kumar" required autocomplete="name">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Email Address</label>
+          <div class="input-wrapper">
+            <span class="input-icon">📧</span>
+            <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Password</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="pwd" name="password" placeholder="Create a strong password" required oninput="checkStrength(this.value)">
+            <button type="button" class="pwd-eye" onclick="togglePwd('pwd', this)">👁</button>
+          </div>
+          <div class="pwd-strength">
+            <div class="pwd-bar-wrap"><div class="pwd-bar" id="pwdBar"></div></div>
+            <div class="pwd-hint" id="pwdHint">Minimum 8 characters</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔐</span>
+            <input type="password" id="cpwd" name="confirm_password" placeholder="Repeat your password" required oninput="checkMatch()">
+            <button type="button" class="pwd-eye" onclick="togglePwd('cpwd', this)">👁</button>
+          </div>
+          <div class="pwd-hint" id="matchHint"></div>
+        </div>
+
+        <button type="submit" class="btn-submit">⚡ Create My Free Account</button>
+
+        <p class="terms-text">By registering you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></p>
+      </form>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+function togglePwd(id, btn) {
+  const i = document.getElementById(id);
+  i.type = i.type === 'password' ? 'text' : 'password';
+  btn.textContent = i.type === 'password' ? '👁' : '🙈';
+}
+
+function checkStrength(val) {
+  const bar = document.getElementById('pwdBar');
+  const hint = document.getElementById('pwdHint');
+  let score = 0;
+  if (val.length >= 8) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const colors = ['#ef4444','#f97316','#eab308','#22c55e'];
+  const labels = ['Weak','Fair','Good','Strong 💪'];
+  const widths = ['25%','50%','75%','100%'];
+  bar.style.width = score > 0 ? widths[score-1] : '0%';
+  bar.style.background = score > 0 ? colors[score-1] : 'transparent';
+  hint.textContent = score > 0 ? labels[score-1] : 'Minimum 8 characters';
+  hint.style.color = score > 0 ? colors[score-1] : 'var(--muted)';
+}
+
+function checkMatch() {
+  const p = document.getElementById('pwd').value;
+  const c = document.getElementById('cpwd').value;
+  const hint = document.getElementById('matchHint');
+  if (!c) { hint.textContent = ''; return; }
+  if (p === c) {
+    hint.textContent = '✓ Passwords match';
+    hint.style.color = '#22c55e';
+  } else {
+    hint.textContent = '✗ Passwords do not match';
+    hint.style.color = '#ef4444';
+  }
+}
+</script>
+</body>
+</html>

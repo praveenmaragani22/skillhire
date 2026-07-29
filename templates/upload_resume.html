@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Resume | SkillMatch</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Segoe UI", system-ui, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+        }
+
+        /* PAGE BACKGROUND */
+        .upload-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            padding: 20px;
+        }
+
+        /* CARD */
+        .upload-card {
+            background: #ffffff;
+            width: 420px;
+            padding: 40px 35px;
+            border-radius: 22px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+            text-align: center;
+        }
+
+        /* HEADER */
+        .upload-header .icon {
+            font-size: 34px;
+            margin-bottom: 10px;
+        }
+
+        .upload-header h1 {
+            font-size: 26px;
+            color: #0f172a;
+        }
+
+        .upload-header p {
+            margin-top: 8px;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        /* UPLOAD BOX */
+        .upload-box {
+            display: block;
+            margin: 30px 0;
+            border: 2px dashed #c7d2fe;
+            border-radius: 16px;
+            padding: 30px;
+            cursor: pointer;
+            transition: 0.3s ease;
+        }
+
+        .upload-box:hover {
+            background: #f8fafc;
+            border-color: #4f46e5;
+        }
+
+        .upload-icon {
+            font-size: 30px;
+        }
+
+        .upload-content h3 {
+            margin: 10px 0 5px;
+            font-size: 16px;
+            color: #0f172a;
+        }
+
+        .upload-content span {
+            font-size: 14px;
+            color: #4f46e5;
+        }
+
+        .upload-content small {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        /* ANALYSIS INFO */
+        .analysis-info {
+            text-align: left;
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 14px;
+            margin-bottom: 25px;
+        }
+
+        .analysis-info h4 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+
+        .analysis-info ul {
+            list-style: none;
+            font-size: 13px;
+            color: #334155;
+        }
+
+        .analysis-info li {
+            margin-bottom: 6px;
+        }
+
+        /* ACTION BUTTONS */
+        .actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn.primary {
+            background: #4f46e5;
+            color: #ffffff;
+        }
+
+        .btn.primary:hover {
+            background: #4338ca;
+        }
+
+        .btn.secondary {
+            background: #e5e7eb;
+            color: #0f172a;
+        }
+
+        /* SECURITY */
+        .security {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        /* MOBILE */
+        @media (max-width: 480px) {
+            .upload-card {
+                width: 100%;
+                padding: 30px 25px;
+            }
+        }
+    </style>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</head>
+<body>
+
+<div class="upload-page">
+
+    <div class="upload-card">
+
+        <div class="upload-header">
+            <div class="icon">📄</div>
+            <h1>Upload Your Resume</h1>
+            <p>
+                Let SkillMatch analyze your skills and recommend
+                the best job roles for you.
+            </p>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <label class="upload-box">
+                <input type="file" name="resume" hidden required>
+                <div class="upload-content">
+                    <div class="upload-icon">⬆️</div>
+                    <h3>Drag & Drop your resume</h3>
+                    <span>or click to browse</span>
+                    <small>PDF, DOC, DOCX (Max 2MB)</small>
+                </div>
+            </label>
+
+            <div class="analysis-info">
+                <h4>What we analyze</h4>
+                <ul>
+                    <li>✔ Technical & soft skills</li>
+                    <li>✔ Resume strength score</li>
+                    <li>✔ Job role matching</li>
+                </ul>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="btn primary">
+                    Upload & Analyze
+                </button>
+                <button type="button" class="btn secondary" onclick="window.location.href='/'">
+                    Cancel
+                </button>
+            </div>
+
+        </form>
+
+        <div class="security">
+            🔒 Your resume is secure and never shared
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

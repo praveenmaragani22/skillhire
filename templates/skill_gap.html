@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Skill Gap | SkillHire</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark"><div class="logo-icon">⚡</div><span class="logo-text">SkillHire</span></div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar">👤</div>
+      <div class="user-name">{{ user["name"] }}</div>
+      <div class="user-role">{{ user.get("job_fit","Job Seeker") }}</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/dashboard" class="nav-item"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="/resume_analyzer" class="nav-item"><span class="nav-icon">📄</span> Resume Analyzer</a>
+      <a href="/job_matches" class="nav-item"><span class="nav-icon">🎯</span> Job Matches</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="/skill_gap" class="nav-item active"><span class="nav-icon">📊</span> Skill Gap</a>
+      <a href="/interviews" class="nav-item"><span class="nav-icon">🎤</span> Interview Prep</a>
+      <div class="nav-section-label">Track</div>
+      <a href="/applications" class="nav-item"><span class="nav-icon">📋</span> Applications</a>
+      <a href="/settings" class="nav-item"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="nav-item" style="color:#f87171;"><span class="nav-icon">🚪</span> Sign Out</a>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <div class="topbar">
+      <span class="page-title">Skill Gap Analysis</span>
+      <div class="topbar-right"><button class="topbar-btn">🔔</button><button id="themeToggleBtn" class="dashboard-theme-toggle" onclick="toggleTheme()">☀️ Light Mode</button></div>
+    </div>
+
+    <div class="page-content">
+
+      {% if not user["resume_uploaded"] %}
+      <div class="alert alert-warn">
+        ⚠️ Upload your resume first for a personalized skill gap analysis.
+        <a href="/upload_resume" style="color:var(--warning); font-weight:600; margin-left:8px;">Upload Now →</a>
+      </div>
+      {% endif %}
+
+      <!-- TARGET ROLE SELECTOR — live update -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="section-header">
+          <span class="section-title">🎯 Analyze Gap for a Specific Job Role</span>
+        </div>
+        <form method="POST" action="/skill_gap" style="display:flex; gap:12px; margin-top:14px; flex-wrap:wrap; align-items:flex-end;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div style="flex:1; min-width:220px;">
+            <label style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.05em; display:block; margin-bottom:6px;">SELECT TARGET ROLE</label>
+            <select name="target_role" class="form-select">
+              {% for role in ['Backend Developer','Full Stack Engineer','Frontend Developer','Data Scientist','DevOps Engineer','ML Engineer','Android Developer','Cyber Security Engineer'] %}
+                <option value="{{ role }}" {{ 'selected' if selected_role==role else '' }}>{{ role }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn-primary" style="height:44px; padding:0 24px;">🔍 Analyze Gap</button>
+        </form>
+
+        <!-- Summary bar -->
+        {% if user["resume_uploaded"] %}
+        <div style="margin-top:20px; padding:16px; background:var(--surface2); border-radius:12px; border:1px solid var(--border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="font-size:13px; color:var(--muted2);">Analyzing gap for role</div>
+              <div style="font-family:'Syne',sans-serif; font-size:18px; font-weight:800; color:var(--accent2);">{{ selected_role }}</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-family:'Syne',sans-serif; font-size:28px; font-weight:800;
+                color:{% if readiness >= 70 %}var(--success){% elif readiness >= 40 %}var(--warning){% else %}var(--danger){% endif %};">
+                {{ readiness }}%
+              </div>
+              <div style="font-size:12px; color:var(--muted2);">Role Readiness</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-family:'Syne',sans-serif; font-size:28px; font-weight:800; color:var(--success);">{{ user["skills"]|length }}</div>
+              <div style="font-size:12px; color:var(--muted2);">Skills You Have</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-family:'Syne',sans-serif; font-size:28px; font-weight:800; color:var(--danger);">{{ gap_skills|length }}</div>
+              <div style="font-size:12px; color:var(--muted2);">Skills Missing</div>
+            </div>
+          </div>
+          <div class="progress-track" style="margin-top:12px;">
+            <div class="progress-fill" style="width:{{ readiness }}%;
+              background:{% if readiness >= 70 %}linear-gradient(90deg,#34d399,#6ee7b7){% elif readiness >= 40 %}linear-gradient(90deg,#fbbf24,#fde68a){% else %}linear-gradient(90deg,#f87171,#fca5a5){% endif %};"></div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="content-grid">
+        <!-- SKILLS YOU HAVE -->
+        <div class="card">
+          <div class="section-header">
+            <span class="section-title">✅ Skills You Have</span>
+            <span style="font-size:13px; color:var(--success); font-weight:600;">{{ user["skills"]|length }} skills</span>
+          </div>
+          {% if user["resume_uploaded"] and user["skills"] %}
+            {% for i in range(user["skills"]|length) %}
+            <div class="skill-bar-item">
+              <div class="skill-bar-header">
+                <span>{{ user["skills"][i] }}</span>
+                <span style="color:var(--success);">{{ user["skill_levels"][i] if user.get("skill_levels") and i < user["skill_levels"]|length else 70 }}%</span>
+              </div>
+              <div class="skill-bar-track">
+                <div class="skill-bar-fill" style="width:{{ user['skill_levels'][i] if user.get('skill_levels') and i < user['skill_levels']|length else 70 }}%; background:linear-gradient(90deg,var(--accent4),#6ee7b7);"></div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state" style="padding:30px 0;">
+              <div class="empty-icon">🧠</div>
+              <div class="empty-text">Upload resume to see your skills</div>
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- ROLE READINESS SUMMARY -->
+        <div class="card">
+          <div class="section-header">
+            <span class="section-title">🎯 Role Readiness Summary</span>
+          </div>
+          {% if user["resume_uploaded"] %}
+          <div style="text-align:center; padding:20px 0;">
+            <div style="font-family:'Syne',sans-serif; font-size:56px; font-weight:900;
+              color:{% if readiness >= 70 %}var(--success){% elif readiness >= 40 %}var(--warning){% else %}var(--danger){% endif %};">
+              {{ readiness }}%
+            </div>
+            <div style="font-size:14px; color:var(--muted2); margin-bottom:16px;">Ready for {{ selected_role }}</div>
+            <div style="background:var(--surface2); border-radius:12px; padding:14px; text-align:left;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="font-size:13px; color:var(--muted2);">Skills You Have</span>
+                <span style="font-size:13px; font-weight:700; color:var(--success);">{{ user["skills"]|length }}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="font-size:13px; color:var(--muted2);">Core Gaps</span>
+                <span style="font-size:13px; font-weight:700; color:var(--danger);">{{ gap_skills|length }}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="font-size:13px; color:var(--muted2);">AI-Era Gaps</span>
+                <span style="font-size:13px; font-weight:700; color:#a78bfa;">{{ ai_era_skills|length }}</span>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="empty-state" style="padding:30px 0;">
+            <div class="empty-icon">📊</div>
+            <div class="empty-text">Upload resume for readiness score</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- RADAR CHART — role vs user skills -->
+      {% if user["resume_uploaded"] and user["skills"] %}
+      <div class="card" style="margin-bottom:28px;">
+        <div class="section-header">
+          <span class="section-title">📡 Skill Radar — You vs {{ selected_role }}</span>
+        </div>
+        <div style="max-width:420px; margin:0 auto; padding:20px 0;">
+          <canvas id="radarChart"></canvas>
+        </div>
+      </div>
+
+      <!-- LEARNING ROADMAP — specific to selected role -->
+      <div class="card" style="margin-bottom:28px;">
+        <div class="section-header">
+          <span class="section-title">🗺️ Learning Roadmap for {{ selected_role }}</span>
+          <a href="/interviews?role={{ selected_role|urlencode }}" class="section-link">Practice questions →</a>
+        </div>
+        <div style="margin-top:14px; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px;">
+          {% for step in roadmap %}
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:18px; position:relative; overflow:hidden;">
+            <div style="position:absolute; top:0; left:0; right:0; height:3px; background:{{ step.color }};"></div>
+            <div style="font-size:11px; color:var(--accent); font-weight:700; letter-spacing:0.05em; margin-bottom:8px;">{{ step.week }}</div>
+            <div style="font-size:15px; font-weight:700; margin-bottom:6px;">{{ step.title }}</div>
+            <div style="font-size:12px; color:var(--muted2); line-height:1.5;">{{ step.desc }}</div>
+            {% if step.resources %}
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+              {% for res in step.resources %}
+              <a href="{{ res.url }}" target="_blank" style="font-size:11px; color:var(--accent2); text-decoration:none; display:block; margin-bottom:3px;">→ {{ res.name }}</a>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- AI-ERA SKILL GAP — extra skills needed in the AI era -->
+      {% if ai_era_skills %}
+      <div class="card" style="margin-bottom:28px; border: 2px solid rgba(99,102,241,0.3); background: linear-gradient(135deg, rgba(99,102,241,0.05), rgba(34,211,238,0.05));">
+        <div class="section-header" style="margin-bottom:6px;">
+          <span class="section-title">🤖 AI-Era Skill Gap — Skills You Need to Survive in 2025+</span>
+        </div>
+        <div style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.3); border-radius:10px; padding:14px 16px; margin-bottom:20px;">
+          <div style="font-size:13px; color:#fbbf24; font-weight:700; margin-bottom:4px;">⚡ Why This Matters</div>
+          <div style="font-size:13px; color:var(--muted2); line-height:1.6;">
+            In the AI era, your existing skills alone are not enough to get placed in top companies.
+            Companies now expect <strong style="color:var(--text);">AI-awareness + domain skills</strong>.
+            The gap below shows exactly what you need to <strong style="color:var(--success);">survive and thrive</strong> as a {{ selected_role }} in 2025 and beyond.
+          </div>
+        </div>
+        <div style="display:grid; gap:20px;">
+          {% for skill in ai_era_skills %}
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:20px; position:relative; overflow:hidden;">
+            <div style="position:absolute; top:0; left:0; bottom:0; width:4px; background:linear-gradient(180deg,#6366f1,#22d3ee);"></div>
+            <div style="padding-left:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+                <div>
+                  <div style="font-size:16px; font-weight:800; color:var(--text);">🚀 {{ skill.name }}</div>
+                  <div style="font-size:12px; color:var(--muted2); margin-top:4px; line-height:1.5;">{{ skill.why }}</div>
+                </div>
+                <span style="background:linear-gradient(135deg,#6366f1,#22d3ee); color:white; font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; white-space:nowrap;">AI-Era Essential</span>
+              </div>
+              <div style="margin-bottom:12px;">
+                <span style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.05em;">📖 OFFICIAL DOCS</span>
+                <div style="margin-top:5px;">
+                  <a href="{{ skill.resource_url }}" target="_blank"
+                     style="display:inline-flex; align-items:center; gap:6px; background:rgba(34,211,238,0.1); border:1px solid rgba(34,211,238,0.3); color:var(--accent2); text-decoration:none; font-size:12px; font-weight:600; padding:6px 14px; border-radius:20px;">
+                    🔗 {{ skill.resource }}
+                  </a>
+                </div>
+              </div>
+              {% if skill.youtube %}
+              <div>
+                <span style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.05em;">▶️ YOUTUBE TUTORIALS</span>
+                <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px;">
+                  {% for video in skill.youtube %}
+                  <a href="{{ video.url }}" target="_blank"
+                     style="display:inline-flex; align-items:center; gap:8px; background:#1a1a2e; border:1px solid rgba(239,68,68,0.4); color:#f87171; text-decoration:none; font-size:12px; font-weight:600; padding:8px 14px; border-radius:10px;"
+                     onmouseover="this.style.borderColor='#ef4444'; this.style.background='rgba(239,68,68,0.15)'"
+                     onmouseout="this.style.borderColor='rgba(239,68,68,0.4)'; this.style.background='#1a1a2e'">
+                    <span style="background:#ef4444; color:white; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:800;">▶ YT</span>
+                    {{ video.title }}
+                  </a>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- CORE MISSING SKILLS with YouTube Videos -->
+      {% if gap_skills %}
+      <div class="card" style="margin-bottom:28px;">
+        <div class="section-header">
+          <span class="section-title">📚 Core Skills to Learn — with YouTube Tutorials</span>
+          <span style="font-size:13px; color:var(--danger); font-weight:600;">{{ gap_skills|length }} skills missing</span>
+        </div>
+        <div style="display:grid; gap:16px; margin-top:14px;">
+          {% for skill in gap_skills %}
+          <div style="background:var(--surface2); border:1px solid rgba(248,113,113,0.25); border-radius:12px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+              <div>
+                <span style="font-size:15px; font-weight:700; color:var(--text);">{{ skill.name }}</span>
+                <span style="font-size:11px; color:var(--muted); background:var(--surface); padding:2px 8px; border-radius:10px; margin-left:8px;">{{ skill.level }}</span>
+              </div>
+              <span style="color:var(--danger); font-size:13px; font-weight:700; background:rgba(248,113,113,0.1); padding:3px 10px; border-radius:10px;">{{ skill.importance }}% importance</span>
+            </div>
+            <div class="skill-bar-track" style="margin-bottom:12px;">
+              <div style="height:100%; border-radius:20px; background:linear-gradient(90deg,#f87171,#fca5a5); width:{{ skill.importance }}%;"></div>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+              <a href="{{ skill.resource_url }}" target="_blank"
+                 style="display:inline-flex; align-items:center; gap:6px; background:rgba(34,211,238,0.1); border:1px solid rgba(34,211,238,0.3); color:var(--accent2); text-decoration:none; font-size:12px; font-weight:600; padding:6px 14px; border-radius:20px;">
+                📖 {{ skill.resource }}
+              </a>
+              {% if skill.youtube %}
+                {% for video in skill.youtube %}
+                <a href="{{ video.url }}" target="_blank"
+                   style="display:inline-flex; align-items:center; gap:6px; background:#1a1a2e; border:1px solid rgba(239,68,68,0.4); color:#f87171; text-decoration:none; font-size:12px; font-weight:600; padding:6px 12px; border-radius:20px;"
+                   onmouseover="this.style.background='rgba(239,68,68,0.15)'"
+                   onmouseout="this.style.background='#1a1a2e'">
+                  <span style="background:#ef4444; color:white; font-size:9px; padding:1px 5px; border-radius:3px; font-weight:800;">▶ YT</span>
+                  {{ video.title[:45] }}{% if video.title|length > 45 %}…{% endif %}
+                </a>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+{% if user["resume_uploaded"] and user["skills"] %}
+const radarCtx = document.getElementById('radarChart').getContext('2d');
+
+// Build labels from role required skills + user skills
+const roleLabels = {{ role_skill_labels | tojson }};
+const userScores = {{ user_radar_scores | tojson }};
+const requiredScores = {{ required_radar_scores | tojson }};
+
+new Chart(radarCtx, {
+  type: 'radar',
+  data: {
+    labels: roleLabels,
+    datasets: [
+      {
+        label: 'Your Level',
+        data: userScores,
+        backgroundColor: 'rgba(99,102,241,0.2)',
+        borderColor: '#6366f1',
+        pointBackgroundColor: '#6366f1',
+        borderWidth: 2
+      },
+      {
+        label: 'Required for ' + {{ selected_role | tojson }},
+        data: requiredScores,
+        backgroundColor: 'rgba(34,211,238,0.1)',
+        borderColor: '#22d3ee',
+        pointBackgroundColor: '#22d3ee',
+        borderWidth: 2,
+        borderDash: [5,5]
+      }
+    ]
+  },
+  options: {
+    plugins: {
+      legend: { labels: { color: '#94a3b8', font: { size: 12 } } }
+    },
+    scales: {
+      r: {
+        grid: { color: 'rgba(255,255,255,0.07)' },
+        pointLabels: { color: '#94a3b8', font: { size: 12 } },
+        ticks: { display: false },
+        suggestedMin: 0,
+        suggestedMax: 100
+      }
+    }
+  }
+});
+{% endif %}
+</script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Resume Analyzer | SkillHire</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">⚡</div>
+        <span class="logo-text">SkillHire</span>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar">👤</div>
+      <div class="user-name">{{ user["name"] }}</div>
+      <div class="user-role">{{ user.get("job_fit", "Job Seeker") }}</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/dashboard" class="nav-item"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="/resume_analyzer" class="nav-item active"><span class="nav-icon">📄</span> Resume Analyzer</a>
+      <a href="/job_matches" class="nav-item"><span class="nav-icon">🎯</span> Job Matches <span class="nav-badge">New</span></a>
+      <div class="nav-section-label">Growth</div>
+      <a href="/skill_gap" class="nav-item"><span class="nav-icon">📊</span> Skill Gap</a>
+      <a href="/interviews" class="nav-item"><span class="nav-icon">🎤</span> Interview Prep</a>
+      <div class="nav-section-label">Track</div>
+      <a href="/applications" class="nav-item"><span class="nav-icon">📋</span> Applications</a>
+      <a href="/settings" class="nav-item"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="nav-item" style="color: #f87171;"><span class="nav-icon">🚪</span> Sign Out</a>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <div class="topbar">
+      <span class="page-title">Resume Analyzer</span>
+      <div class="topbar-search">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="Search..." />
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-btn">🔔</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="flash flash-{{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="content-grid">
+        <!-- UPLOAD CARD -->
+        <div class="card">
+          <div class="section-header">
+            <span class="section-title">📤 Upload Resume</span>
+          </div>
+          <form method="POST" action="/upload_resume" enctype="multipart/form-data" id="uploadForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="upload-zone" id="dropZone" onclick="document.getElementById('resumeFile').click()">
+              <div class="upload-icon">📋</div>
+              <div style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">Drop your resume here</div>
+              <div style="font-size: 13px; color: var(--muted);">Supports PDF, DOC, DOCX — max 5MB</div>
+              <input type="file" id="resumeFile" name="resume" accept=".pdf,.doc,.docx" style="display:none;" onchange="showFileName(this)">
+            </div>
+            <div id="fileName" style="font-size: 13px; color: var(--muted2); margin: 10px 0; display: none;"></div>
+            <div style="margin-top: 16px;">
+              <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                ⚡ Analyze Resume
+              </button>
+            </div>
+          </form>
+
+          {% if user["resume_uploaded"] %}
+          <div class="alert alert-success" style="margin-top: 16px;">
+            ✅ Resume analyzed successfully! Skills have been extracted.
+          </div>
+          {% endif %}
+
+          <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
+            <div style="font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 12px;">WHAT WE EXTRACT</div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              {% for item in [('🧠', 'Technical Skills', 'Python, Java, React, etc.'), ('🏢', 'Work Experience', 'Job titles and durations'), ('🎓', 'Education', 'Degrees and institutions'), ('🔧', 'Tools & Frameworks', 'Docker, AWS, MongoDB, etc.')] %}
+              <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <span style="font-size: 20px;">{{ item[0] }}</span>
+                <div>
+                  <div style="font-size: 13px; font-weight: 600;">{{ item[1] }}</div>
+                  <div style="font-size: 12px; color: var(--muted);">{{ item[2] }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- ANALYSIS RESULTS -->
+        <div class="card">
+          <div class="section-header">
+            <span class="section-title">📊 Real ATS Score</span>
+          </div>
+
+          {% if user["resume_uploaded"] %}
+            <!-- Score Ring + Grade -->
+            <div style="text-align: center; padding: 20px 0 12px;">
+              <div style="position: relative; display: inline-block;">
+                <canvas id="scoreChart" width="170" height="170"></canvas>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                  <div style="font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 900; color: {{ user.get('ats_color','#6366f1') }};">{{ user["resume_score"] }}</div>
+                  <div style="font-size: 11px; color: var(--muted);">/ 100</div>
+                </div>
+              </div>
+              <!-- Grade badge -->
+              <div style="margin-top:10px;">
+                <span style="background:{{ user.get('ats_color','#6366f1') }}22; border:1.5px solid {{ user.get('ats_color','#6366f1') }}; color:{{ user.get('ats_color','#6366f1') }}; font-size:13px; font-weight:800; padding:4px 18px; border-radius:20px; letter-spacing:0.05em;">
+                  {{ user.get('ats_grade','N/A') }}
+                </span>
+              </div>
+              <div style="font-size:12px; color:var(--muted2); margin-top:10px; padding:0 12px; line-height:1.5;">{{ user.get('ats_message','') }}</div>
+            </div>
+
+            <!-- Real ATS Breakdown -->
+            {% if user.get('ats_breakdown') %}
+            <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+              <div style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.08em; margin-bottom:12px;">ATS SCORE BREAKDOWN</div>
+              {% for label, data in user['ats_breakdown'].items() %}
+              {% set pct = ((data.score / data.max) * 100)|int %}
+              <div class="skill-bar-item" style="margin-bottom:14px;">
+                <div class="skill-bar-header" style="margin-bottom:5px;">
+                  <span style="font-weight:600;">{{ label }}</span>
+                  <span style="font-weight:800; color:{% if pct >= 70 %}var(--success){% elif pct >= 40 %}var(--warning){% else %}var(--danger){% endif %};">
+                    {{ data.score }}/{{ data.max }}
+                  </span>
+                </div>
+                <div class="skill-bar-track" style="margin-bottom:5px;">
+                  <div style="height:100%; border-radius:20px; width:{{ pct }}%;
+                    background:{% if pct >= 70 %}linear-gradient(90deg,#34d399,#6ee7b7){% elif pct >= 40 %}linear-gradient(90deg,#fbbf24,#fde68a){% else %}linear-gradient(90deg,#f87171,#fca5a5){% endif %};"></div>
+                </div>
+                <div style="font-size:11px; color:var(--muted2); line-height:1.4;">{{ data.detail }}</div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Detected role -->
+            <div style="margin-top: 16px; padding: 14px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); border-radius: 12px;">
+              <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 6px;">BEST MATCH ROLE</div>
+              <div style="font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--accent2);">{{ user.get("job_fit", "Backend Developer") }}</div>
+              <div style="font-size: 13px; color: var(--muted2); margin-top: 4px;">Based on your extracted skills and keyword analysis</div>
+            </div>
+
+          {% else %}
+            <div class="empty-state">
+              <div class="empty-icon">📤</div>
+              <div class="empty-title">No Resume Uploaded</div>
+              <div class="empty-text">Upload your resume on the left to see your real ATS score</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- EXTRACTED SKILLS FULL LIST -->
+      {% if user["resume_uploaded"] and user["skills"] %}
+      <div class="card" style="margin-bottom: 28px;">
+        <div class="section-header">
+          <span class="section-title">🧠 All Extracted Skills</span>
+          <a href="/skill_gap" class="section-link">View skill gap →</a>
+        </div>
+        <div class="skill-tags" style="margin-top: 8px;">
+          {% for skill in user["skills"] %}
+            <span class="skill-tag strong">✓ {{ skill }}</span>
+          {% endfor %}
+        </div>
+        {% if user["missing_skills"] %}
+        <div style="margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border);">
+          <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 10px; letter-spacing: 0.05em;">RECOMMENDED TO ADD</div>
+          <div class="skill-tags">
+            {% for skill in user["missing_skills"] %}
+              <span class="skill-tag missing">+ {{ skill }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+function showFileName(input) {
+  if (input.files[0]) {
+    const fn = document.getElementById('fileName');
+    fn.textContent = '📎 ' + input.files[0].name;
+    fn.style.display = 'block';
+  }
+}
+
+{% if user["resume_uploaded"] %}
+const ctx = document.getElementById('scoreChart').getContext('2d');
+const atsScore = {{ user["resume_score"] }};
+const atsColor = {{ user.get('ats_color', '#6366f1') | tojson }};
+new Chart(ctx, {
+  type: 'doughnut',
+  data: {
+    datasets: [{
+      data: [atsScore, 100 - atsScore],
+      backgroundColor: [atsColor, 'rgba(255,255,255,0.05)'],
+      borderWidth: 0,
+      circumference: 280,
+      rotation: 220
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    cutout: '80%',
+    animation: { animateRotate: true, duration: 1200 }
+  }
+});
+{% endif %}
+</script>
+</body>
+</html>

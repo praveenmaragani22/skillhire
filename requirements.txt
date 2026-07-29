@@ -1,0 +1,30 @@
+# SkillHire - Python dependencies
+# Install with: pip install -r requirements.txt
+
+# Web Framework
+Flask==3.0.3
+
+# MongoDB integration
+Flask-PyMongo==2.3.0
+pymongo==4.7.2
+
+# Security: CSRF protection
+Flask-WTF==1.2.1
+
+# Security: Rate limiting
+Flask-Limiter==3.7.0
+
+# PDF parsing
+PyPDF2==3.0.1
+
+# Word document parsing
+python-docx==1.1.2
+
+# Password hashing (included in Werkzeug, but pin version)
+Werkzeug==3.0.3
+
+# BSON / ObjectId support (bundled with pymongo, but explicit)
+dnspython==2.6.1
+
+# Optional: load environment variables from .env file
+python-dotenv==1.0.1

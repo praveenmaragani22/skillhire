@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Job Matches | SkillHire</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <style>
+    /* ─── JOB PAGE LAYOUT ─────────────────────────────────── */
+    .jobs-layout {
+      display: flex;
+      gap: 0;
+      height: calc(100vh - 64px); /* subtract topbar */
+      overflow: hidden;
+    }
+
+    /* LEFT: Job list */
+    .jobs-list-panel {
+      width: 420px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      padding: 20px;
+      border-right: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    /* RIGHT: Job detail */
+    .job-detail-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+      background: var(--surface);
+    }
+
+    /* Job list card (compact) */
+    .job-list-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .job-list-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(99,102,241,0.12); }
+    .job-list-card.active { border-color: var(--accent); background: var(--accent-light, rgba(99,102,241,0.05)); box-shadow: 0 2px 16px rgba(99,102,241,0.18); }
+    .job-emoji-sm { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .job-list-info { flex: 1; min-width: 0; }
+    .job-list-title { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .job-list-company { font-size: 12px; color: var(--muted2); }
+    .job-list-meta { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .job-match-badge { font-size: 13px; font-weight: 800; flex-shrink: 0; margin-left: auto; padding-top: 2px; }
+
+    /* ─── JOB DETAIL PANEL ─── */
+    .detail-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+      text-align: center;
+      gap: 16px;
+    }
+    .detail-placeholder .ph-icon { font-size: 64px; opacity: 0.3; }
+    .detail-placeholder h3 { font-size: 18px; font-weight: 700; opacity: 0.5; }
+    .detail-placeholder p { font-size: 14px; opacity: 0.4; }
+
+    .job-detail-content { display: none; }
+    .job-detail-content.active { display: block; }
+
+    /* Detail header */
+    .detail-header {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .detail-emoji { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 34px; flex-shrink: 0; }
+    .detail-header-info h1 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+    .detail-header-info .company-line { font-size: 15px; color: var(--muted2); }
+    .detail-header-info .meta-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .meta-chip {
+      font-size: 12px; font-weight: 600; padding: 4px 12px;
+      border-radius: 20px; border: 1px solid var(--border);
+      color: var(--muted2);
+    }
+    .detail-match { text-align: right; flex-shrink: 0; }
+    .detail-match .match-num { font-family: 'Syne', sans-serif; font-size: 38px; font-weight: 800; }
+    .detail-match .match-lbl { font-size: 12px; color: var(--muted); }
+    .detail-match .match-bar { width: 80px; height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .detail-match .match-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #6366f1, #22d3ee); }
+
+    /* Action buttons */
+    .detail-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
+    .apply-primary {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: white; border: none; border-radius: 10px;
+      padding: 12px 24px; font-size: 14px; font-weight: 700;
+      cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+      box-shadow: 0 3px 12px rgba(99,102,241,0.4); transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .apply-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(99,102,241,0.55); }
+    .platform-chip {
+      color: white; border: none; border-radius: 8px;
+      padding: 10px 16px; font-size: 12px; font-weight: 700;
+      cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+      font-family: 'DM Sans', sans-serif; transition: opacity 0.2s;
+    }
+    .platform-chip:hover { opacity: 0.85; }
+    .save-chip {
+      background: var(--surface2, var(--surface)); border: 1px solid var(--border);
+      color: var(--muted2); border-radius: 8px;
+      padding: 10px 16px; font-size: 12px; font-weight: 700; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    }
+    .save-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Sections */
+    .detail-section { margin-bottom: 24px; }
+    .detail-section h3 { font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 12px; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
+    .detail-section p { font-size: 14px; color: var(--muted2); line-height: 1.8; }
+
+    /* Skill tags */
+    .skill-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .skill-chip {
+      font-size: 12px; font-weight: 700; padding: 5px 12px;
+      border-radius: 8px; border: 1px solid;
+    }
+    .skill-chip.has { background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.35); color: #34d399; }
+    .skill-chip.missing { background: rgba(248,113,113,0.07); border-color: rgba(248,113,113,0.2); color: var(--muted2); }
+
+    /* About company */
+    .company-info-box {
+      background: var(--bg, #f8fafc);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+    body.dark-mode .company-info-box { background: rgba(255,255,255,0.03); }
+    .company-info-box .ci-title { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+    .company-info-box .ci-text { font-size: 13px; color: var(--muted2); line-height: 1.7; }
+
+    /* Highlights */
+    .highlights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .hl-card { background: var(--surface2, var(--bg)); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    body.dark-mode .hl-card { background: rgba(255,255,255,0.03); }
+    .hl-card .hl-icon { font-size: 20px; margin-bottom: 6px; }
+    .hl-card .hl-title { font-size: 11px; color: var(--muted); font-weight: 700; }
+    .hl-card .hl-val { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 2px; }
+
+    /* Search / filter bar */
+    .search-filter-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .search-filter-bar input {
+      flex: 1;
+      min-width: 160px;
+      padding: 9px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-filter-bar input:focus { border-color: var(--accent); }
+    .filter-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .fbtn {
+      padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+      border: 1px solid var(--border); cursor: pointer; background: var(--surface);
+      color: var(--muted2); font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    }
+    .fbtn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .jobs-layout { flex-direction: column; height: auto; }
+      .jobs-list-panel { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      .job-detail-panel { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark"><div class="logo-icon">⚡</div><span class="logo-text">SkillHire</span></div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar">👤</div>
+      <div class="user-name">{{ user["name"] }}</div>
+      <div class="user-role">{{ user.get("job_fit","Job Seeker") }}</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/dashboard" class="nav-item"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="/resume_analyzer" class="nav-item"><span class="nav-icon">📄</span> Resume Analyzer</a>
+      <a href="/job_matches" class="nav-item active"><span class="nav-icon">🎯</span> Job Matches</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="/skill_gap" class="nav-item"><span class="nav-icon">📊</span> Skill Gap</a>
+      <a href="/interviews" class="nav-item"><span class="nav-icon">🎤</span> Interview Prep</a>
+      <div class="nav-section-label">Track</div>
+      <a href="/applications" class="nav-item"><span class="nav-icon">📋</span> Applications</a>
+      <a href="/settings" class="nav-item"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="nav-item" style="color:#f87171;"><span class="nav-icon">🚪</span> Sign Out</a>
+    </div>
+  </aside>
+
+  <div class="main-area" style="overflow:hidden;display:flex;flex-direction:column;">
+    <div class="topbar">
+      <span class="page-title">Job Matches</span>
+      <div class="topbar-right">
+        <button class="topbar-btn">🔔</button>
+        <button id="themeToggleBtn" class="dashboard-theme-toggle" onclick="toggleTheme()">☀️ Light Mode</button>
+      </div>
+    </div>
+
+    {% if not user["resume_uploaded"] %}
+    <div style="padding: 0 24px;">
+      <div class="alert alert-warn">
+        ⚠️ Upload your resume first to see personalized job matches.
+        <a href="/upload_resume" style="color:var(--warning);font-weight:600;margin-left:8px;">Upload Now →</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="jobs-layout">
+
+      <!-- LEFT: Job List -->
+      <div class="jobs-list-panel">
+
+        <div class="search-filter-bar">
+          <input type="text" placeholder="🔍 Search jobs…" id="jobSearch" oninput="filterJobs()">
+        </div>
+        <div class="filter-btns" style="margin-bottom:14px;">
+          {% for f in ['All','Full-time','Remote','Hybrid','Internship'] %}
+          <button class="fbtn {{ 'active' if f=='All' else '' }}" onclick="setFilter('{{ f }}', this)">{{ f }}</button>
+          {% endfor %}
+        </div>
+
+        <div style="font-size:12px; color:var(--muted); margin-bottom:10px; font-weight:600;">
+          {{ jobs|length }} jobs found · sorted by match
+        </div>
+
+        {% set user_skills_lower = user.get("skills", []) | map('lower') | list %}
+
+        {% for job in jobs %}
+        {% set matched_count = namespace(n=0) %}
+        {% for skill in job.skills %}
+          {% if skill.lower() in user_skills_lower %}{% set matched_count.n = matched_count.n + 1 %}{% endif %}
+        {% endfor %}
+
+        <div class="job-list-card" 
+             id="listcard-{{ loop.index }}"
+             data-type="{{ job.type }}"
+             data-search="{{ job.title.lower() }} {{ job.company.lower() }} {{ job.location.lower() }}"
+             onclick="showJobDetail({{ loop.index }})">
+
+          <div class="job-emoji-sm" style="background:{{ job.color }};">{{ job.emoji }}</div>
+          <div class="job-list-info">
+            <div class="job-list-title">{{ job.title }}</div>
+            <div class="job-list-company">{{ job.company }} · 📍 {{ job.location }}</div>
+            <div class="job-list-meta">
+              <span class="badge badge-saved" style="font-size:10px;">{{ job.type }}</span>
+              <span style="font-size:11px;color:var(--accent2);font-weight:700;">{{ job.salary }}</span>
+              <span style="font-size:11px;color:{% if matched_count.n == job.skills|length %}var(--success){% else %}var(--muted){% endif %};font-weight:600;">
+                ✓ {{ matched_count.n }}/{{ job.skills|length }} skills
+              </span>
+            </div>
+          </div>
+          <div class="job-match-badge" style="color:{% if job.match >= 80 %}var(--success){% elif job.match >= 65 %}var(--warning){% else %}var(--muted2){% endif %};">
+            {{ job.match }}%
+          </div>
+        </div>
+        {% endfor %}
+
+      </div>
+
+      <!-- RIGHT: Job Detail -->
+      <div class="job-detail-panel">
+
+        <!-- Placeholder when no job selected -->
+        <div class="detail-placeholder" id="detailPlaceholder">
+          <div class="ph-icon">🎯</div>
+          <h3>Select a job to view details</h3>
+          <p>Click any job on the left to see full details, required skills, and apply options</p>
+        </div>
+
+        <!-- Job detail content (populated via JS) -->
+        {% for job in jobs %}
+        {% set user_skills_lower2 = user.get("skills", []) | map('lower') | list %}
+        {% set matched2 = namespace(n=0) %}
+        {% for skill in job.skills %}{% if skill.lower() in user_skills_lower2 %}{% set matched2.n = matched2.n + 1 %}{% endif %}{% endfor %}
+
+        <div class="job-detail-content" id="detail-{{ loop.index }}">
+
+          <!-- Header -->
+          <div class="detail-header">
+            <div class="detail-emoji" style="background:{{ job.color }};">{{ job.emoji }}</div>
+            <div class="detail-header-info" style="flex:1;">
+              <h1>{{ job.title }}</h1>
+              <div class="company-line">{{ job.company }} &nbsp;·&nbsp; 📍 {{ job.location }}</div>
+              <div class="meta-chips">
+                <span class="meta-chip">{{ job.type }}</span>
+                <span class="meta-chip">💰 {{ job.salary }}</span>
+                <span class="meta-chip">📅 Posted recently</span>
+                <span class="meta-chip">🕐 Full-time</span>
+              </div>
+            </div>
+            <div class="detail-match">
+              <div class="match-num" style="color:{% if job.match >= 80 %}var(--success){% elif job.match >= 65 %}var(--warning){% else %}var(--muted2){% endif %};">
+                {{ job.match }}%
+              </div>
+              <div class="match-lbl">skill match</div>
+              <div class="match-bar">
+                <div class="match-bar-fill" style="width:{{ job.match }}%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="detail-actions">
+            <a href="{{ job.company_career_url }}" target="_blank" class="apply-primary">
+              🚀 Apply on {{ job.company.split('(')[0].strip() }}
+            </a>
+            <a href="{{ job.live_naukri }}" target="_blank" class="platform-chip" style="background:#e05c34;">🔍 Naukri</a>
+            <a href="{{ job.live_linkedin }}" target="_blank" class="platform-chip" style="background:#0a66c2;">💼 LinkedIn</a>
+            <a href="{{ job.live_indeed }}" target="_blank" class="platform-chip" style="background:#2164f3;">🌐 Indeed</a>
+            <form method="POST" action="/save_job" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="job_title" value="{{ job.title }}">
+              <input type="hidden" name="company" value="{{ job.company }}">
+              <button type="submit" class="save-chip">🔖 Save</button>
+            </form>
+            <form method="POST" action="/apply_job" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="job_title" value="{{ job.title }}">
+              <input type="hidden" name="company" value="{{ job.company }}">
+              <input type="hidden" name="job_type" value="{{ job.type }}">
+              <button type="submit" class="apply-primary" style="background:linear-gradient(135deg,#22c55e,#16a34a);box-shadow:0 3px 12px rgba(34,197,94,0.3);">✓ Mark Applied</button>
+            </form>
+          </div>
+
+          <!-- Highlights grid -->
+          <div class="detail-section">
+            <h3>📊 Job Overview</h3>
+            <div class="highlights-grid">
+              <div class="hl-card">
+                <div class="hl-icon">💰</div>
+                <div class="hl-title">SALARY</div>
+                <div class="hl-val">{{ job.salary }}</div>
+              </div>
+              <div class="hl-card">
+                <div class="hl-icon">📍</div>
+                <div class="hl-title">LOCATION</div>
+                <div class="hl-val">{{ job.location }}</div>
+              </div>
+              <div class="hl-card">
+                <div class="hl-icon">🏢</div>
+                <div class="hl-title">COMPANY</div>
+                <div class="hl-val">{{ job.company }}</div>
+              </div>
+              <div class="hl-card">
+                <div class="hl-icon">⏰</div>
+                <div class="hl-title">JOB TYPE</div>
+                <div class="hl-val">{{ job.type }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div class="detail-section">
+            <h3>📝 Job Description</h3>
+            <p>{{ job.desc }}</p>
+            <p style="margin-top:10px;">
+              This role requires you to work in a collaborative team environment, contribute to product development,
+              and maintain high coding standards. You will participate in code reviews, sprint planning, and
+              technical discussions with senior engineers.
+            </p>
+          </div>
+
+          <!-- Skills -->
+          <div class="detail-section">
+            <h3>🛠️ Required Skills
+              <span style="font-size:12px;font-weight:600;color:var(--success);">
+                {{ matched2.n }}/{{ job.skills|length }} you have
+              </span>
+            </h3>
+            <div class="skill-chips">
+              {% for skill in job.skills %}
+                {% if skill.lower() in user_skills_lower2 %}
+                  <span class="skill-chip has">✓ {{ skill }}</span>
+                {% else %}
+                  <span class="skill-chip missing">{{ skill }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+            {% if matched2.n < job.skills|length %}
+            <div style="margin-top:12px;font-size:13px;color:var(--warning);">
+              💡 Missing {{ job.skills|length - matched2.n }} skill(s) —
+              <a href="/skill_gap" style="color:var(--accent);font-weight:600;text-decoration:none;">View skill gap analysis →</a>
+            </div>
+            {% else %}
+            <div style="margin-top:12px;font-size:13px;color:var(--success);">🎯 Perfect skill match! You have all required skills.</div>
+            {% endif %}
+          </div>
+
+          <!-- Responsibilities -->
+          <div class="detail-section">
+            <h3>🎯 Key Responsibilities</h3>
+            <p style="white-space: pre-line;">• Design and develop scalable {{ job.title }} solutions
+• Collaborate with cross-functional teams on product features
+• Write clean, well-tested, and maintainable code
+• Participate in code reviews and technical design sessions
+• Debug and resolve production issues and performance bottlenecks
+• Stay current with industry best practices and emerging technologies</p>
+          </div>
+
+          <!-- Company info -->
+          <div class="detail-section">
+            <h3>🏢 About {{ job.company }}</h3>
+            <div class="company-info-box">
+              <div class="ci-title">{{ job.company }}</div>
+              <div class="ci-text">
+                A leading technology company with a strong presence across India and globally.
+                Known for its strong engineering culture, employee development programs, and competitive
+                compensation packages. Offers excellent growth opportunities for talented engineers.
+              </div>
+            </div>
+          </div>
+
+          <!-- Prep interview -->
+          <div style="background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(20,184,166,0.08));border:1px solid rgba(99,102,241,0.25);border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px;margin-top:4px;">
+            <span style="font-size:28px;">🎤</span>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:800;color:var(--text);">Prepare for this interview</div>
+              <div style="font-size:12px;color:var(--muted2);margin-top:3px;">Practice with real {{ job.title }} interview questions including from {{ job.company }}</div>
+            </div>
+            <a href="/interviews?role={{ job.title|replace(' ','+')|urlencode }}" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;text-decoration:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 2px 10px rgba(99,102,241,0.35);">
+              Practice Now →
+            </a>
+          </div>
+
+        </div>
+        {% endfor %}
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentFilter = 'All';
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterJobs();
+}
+
+function filterJobs() {
+  const q = document.getElementById('jobSearch').value.toLowerCase();
+  document.querySelectorAll('.job-list-card').forEach(card => {
+    const typeOk = currentFilter === 'All' || card.dataset.type === currentFilter;
+    const textOk = !q || card.dataset.search.includes(q);
+    card.style.display = (typeOk && textOk) ? 'flex' : 'none';
+  });
+}
+
+function showJobDetail(idx) {
+  // Update list cards
+  document.querySelectorAll('.job-list-card').forEach(c => c.classList.remove('active'));
+  const listCard = document.getElementById('listcard-' + idx);
+  if (listCard) listCard.classList.add('active');
+
+  // Hide placeholder
+  document.getElementById('detailPlaceholder').style.display = 'none';
+
+  // Hide all detail panels
+  document.querySelectorAll('.job-detail-content').forEach(d => d.classList.remove('active'));
+
+  // Show selected
+  const detail = document.getElementById('detail-' + idx);
+  if (detail) detail.classList.add('active');
+}
+</script>
+</body>
+</html>

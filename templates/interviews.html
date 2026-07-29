@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>AI Interview | SkillHire</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <style>
+    /* ── AI INTERVIEW SPECIFIC STYLES ── */
+    .ai-banner {
+      background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(20,184,166,0.1));
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .ai-badge {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: white;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    /* ── PHOTO VERIFY MODAL ── */
+    #photoVerifyModal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    #photoVerifyModal.active { display: flex; }
+    .pv-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px;
+      width: 480px;
+      max-width: 95vw;
+      text-align: center;
+    }
+    .pv-box h2 { font-family:'Syne',sans-serif; font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+    .pv-box p  { font-size: 14px; color: var(--muted2); margin-bottom: 20px; line-height: 1.6; }
+    #pvVideo {
+      width: 100%;
+      border-radius: 14px;
+      background: #000;
+      margin-bottom: 14px;
+      transform: scaleX(-1); /* mirror */
+    }
+    #pvCanvas { display: none; }
+    #pvCapturedImg { display: none; width: 100%; border-radius: 14px; margin-bottom: 14px; }
+    .pv-status {
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .pv-status.pending  { background: rgba(251,191,36,0.12); color: #fbbf24; }
+    .pv-status.success  { background: rgba(52,211,153,0.12); color: #34d399; }
+    .pv-status.error    { background: rgba(248,113,113,0.12); color: #f87171; }
+    .pv-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+    /* ── AI INTERVIEW MODAL ── */
+    #aiInterviewModal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.95);
+      z-index: 400;
+      flex-direction: column;
+    }
+    #aiInterviewModal.active { display: flex; }
+
+    .ai-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .ai-modal-header .title { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; color:#f1f5f9; }
+    .ai-modal-header .subtitle { font-size:12px; color:#94a3b8; margin-top:2px; }
+
+    .ai-modal-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* LEFT: Camera + Status */
+    .ai-cam-panel {
+      width: 340px;
+      flex-shrink: 0;
+      background: #0a0e1a;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 14px;
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    .cam-frame {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #000;
+    }
+    #aiCamVideo {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    .cam-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    /* Corner brackets */
+    .cam-overlay::before, .cam-overlay::after {
+      content: '';
+      position: absolute;
+      width: 28px; height: 28px;
+      border-color: #6366f1;
+      border-style: solid;
+    }
+    .cam-overlay::before { top: 10px; left: 10px; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .cam-overlay::after  { bottom: 10px; right: 10px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+    .cam-dot {
+      position: absolute;
+      top: 12px; right: 12px;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 2px rgba(34,197,94,0.3);
+      animation: blink 1.4s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .face-match-box {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 12px;
+    }
+    .face-match-box .fm-label { color: #94a3b8; font-weight: 600; margin-bottom: 6px; }
+    .fm-bar-wrap { height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+    .fm-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #6366f1, #22c55e); transition: width 1s; }
+
+    .ai-status-indicators {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .status-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px; font-size: 12px; color: #94a3b8;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .status-dot.green  { background: #22c55e; }
+    .status-dot.yellow { background: #fbbf24; animation: blink 1s infinite; }
+    .status-dot.red    { background: #f87171; }
+    .status-dot.grey   { background: #475569; }
+
+    /* Reference photo */
+    .ref-photo-frame {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #6366f1;
+    }
+    .ref-photo-frame img { width: 100%; display: block; }
+    .ref-photo-frame .rp-label { text-align: center; font-size: 10px; color: #6366f1; font-weight: 700; padding: 4px; background: rgba(99,102,241,0.1); }
+
+    /* RIGHT: Interview content */
+    .ai-interview-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 28px;
+      gap: 20px;
+      overflow-y: auto;
+      background: #0f172a;
+    }
+
+    .ai-progress-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .ai-progress-bar .prog-text { font-size: 13px; color: #94a3b8; white-space: nowrap; font-weight: 600; }
+    .prog-track { flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; }
+    .prog-fill  { height: 100%; background: linear-gradient(90deg, #6366f1, #22d3ee); border-radius: 6px; transition: width 0.5s; }
+    .timer-badge {
+      background: rgba(251,191,36,0.12);
+      border: 1px solid rgba(251,191,36,0.25);
+      color: #fbbf24;
+      font-weight: 800;
+      font-size: 15px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      white-space: nowrap;
+      font-family: monospace;
+    }
+    .timer-badge.urgent { color: #f87171; background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.25); animation: blink 0.7s infinite; }
+
+    /* AI speaking bubble */
+    .ai-speaking-box {
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.22);
+      border-radius: 16px;
+      padding: 22px;
+      position: relative;
+    }
+    .ai-avatar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .ai-avatar {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, #6366f1, #22d3ee);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .ai-name { font-weight: 800; font-size: 14px; color: #f1f5f9; }
+    .ai-role { font-size: 12px; color: #94a3b8; }
+    .ai-wave { display: flex; gap: 3px; align-items: flex-end; margin-left: auto; }
+    .ai-wave span {
+      width: 3px; background: #6366f1; border-radius: 2px;
+      animation: wave 1.2s ease-in-out infinite;
+    }
+    .ai-wave span:nth-child(2) { animation-delay: 0.15s; }
+    .ai-wave span:nth-child(3) { animation-delay: 0.30s; }
+    .ai-wave span:nth-child(4) { animation-delay: 0.45s; }
+    .ai-wave span:nth-child(5) { animation-delay: 0.60s; }
+    @keyframes wave {
+      0%,100% { height: 6px; }
+      50% { height: 20px; }
+    }
+    #aiQuestionText {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f1f5f9;
+      line-height: 1.7;
+    }
+    .q-meta { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .q-tag {
+      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      border-radius: 20px; letter-spacing: 0.04em;
+    }
+    .q-tag.diff-easy   { background: rgba(52,211,153,0.12); color: #34d399; }
+    .q-tag.diff-medium { background: rgba(251,191,36,0.12); color: #fbbf24; }
+    .q-tag.diff-hard   { background: rgba(248,113,113,0.12); color: #f87171; }
+    .q-tag.cat { background: rgba(99,102,241,0.12); color: #a5b4fc; }
+
+    /* Mic / answer area */
+    .answer-area { display: flex; flex-direction: column; gap: 12px; }
+    .answer-area label { font-size: 12px; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em; }
+    #aiAnswerText {
+      background: rgba(255,255,255,0.04);
+      border: 1.5px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px;
+      color: #f1f5f9;
+      font-size: 14px;
+      line-height: 1.6;
+      resize: none;
+      font-family: 'DM Sans', sans-serif;
+      min-height: 110px;
+      transition: border-color 0.2s;
+    }
+    #aiAnswerText:focus { outline: none; border-color: #6366f1; }
+    #aiAnswerText.listening { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.1); }
+
+    .voice-controls { display: flex; gap: 10px; flex-wrap: wrap; }
+    .mic-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 10px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s; border: none; font-family: 'DM Sans', sans-serif;
+    }
+    .mic-btn.idle    { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    .mic-btn.active  { background: rgba(34,197,94,0.15); color: #4ade80; animation: pulse-btn 1s infinite; }
+    .mic-btn.no-speech { background: rgba(248,113,113,0.12); color: #f87171; }
+    @keyframes pulse-btn { 0%,100%{transform:scale(1);} 50%{transform:scale(1.04);} }
+
+    .hint-btn {
+      background: rgba(251,191,36,0.1); color: #fbbf24;
+      border: none; padding: 10px 18px; border-radius: 10px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    }
+    .hint-btn:hover { background: rgba(251,191,36,0.2); }
+
+    /* AI action buttons */
+    .ai-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .ai-next-btn {
+      flex: 2;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: white; border: none; border-radius: 10px;
+      padding: 13px 24px; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .ai-next-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(99,102,241,0.4); }
+    .ai-end-btn {
+      background: rgba(248,113,113,0.1); color: #f87171;
+      border: 1px solid rgba(248,113,113,0.25); border-radius: 10px;
+      padding: 13px 18px; font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    }
+    .ai-end-btn:hover { background: rgba(248,113,113,0.2); }
+
+    /* Hint box */
+    #aiHintBox {
+      display: none;
+      background: rgba(99,102,241,0.08);
+      border-left: 3px solid #6366f1;
+      border-radius: 0 10px 10px 0;
+      padding: 14px; font-size: 13px; color: #c7d2fe; line-height: 1.6;
+    }
+
+    /* RESULTS screen */
+    #aiResultsBox {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .result-score-circle {
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: conic-gradient(#6366f1 0%, #22d3ee 60%, rgba(255,255,255,0.05) 60%);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      position: relative;
+    }
+    .result-score-inner {
+      width: 90px; height: 90px;
+      background: var(--surface, #0f172a);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+    }
+    .result-score-num { font-size: 26px; font-weight: 800; color: #f1f5f9; }
+    .result-score-label { font-size: 10px; color: #94a3b8; font-weight: 600; }
+
+    /* Feedback cards */
+    .feedback-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; text-align: left; }
+    .fb-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; }
+    .fb-card .fb-title { font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; letter-spacing: 0.05em; }
+    .fb-card .fb-val { font-size: 14px; font-weight: 700; color: #f1f5f9; }
+    .fb-card .fb-sub  { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+    /* Regular question bank section */
+    .section-divider {
+      display: flex; align-items: center; gap: 14px;
+      font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 0.06em;
+      margin: 8px 0;
+    }
+    .section-divider::before, .section-divider::after {
+      content:''; flex:1; height:1px; background:var(--border);
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark"><div class="logo-icon">⚡</div><span class="logo-text">SkillHire</span></div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar">👤</div>
+      <div class="user-name">{{ user["name"] }}</div>
+      <div class="user-role">{{ user.get("job_fit","Job Seeker") }}</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/dashboard" class="nav-item"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="/resume_analyzer" class="nav-item"><span class="nav-icon">📄</span> Resume Analyzer</a>
+      <a href="/job_matches" class="nav-item"><span class="nav-icon">🎯</span> Job Matches</a>
+      <div class="nav-section-label">Growth</div>
+      <a href="/skill_gap" class="nav-item"><span class="nav-icon">📊</span> Skill Gap</a>
+      <a href="/interviews" class="nav-item active"><span class="nav-icon">🎤</span> Interview Prep</a>
+      <div class="nav-section-label">Track</div>
+      <a href="/applications" class="nav-item"><span class="nav-icon">📋</span> Applications</a>
+      <a href="/settings" class="nav-item"><span class="nav-icon">⚙️</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="nav-item" style="color:#f87171;"><span class="nav-icon">🚪</span> Sign Out</a>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <div class="topbar">
+      <span class="page-title">Interview Prep</span>
+      <div class="topbar-right">
+        <button class="topbar-btn" onclick="startAIInterview()" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;border:none;font-weight:700;">
+          🤖 Start AI Interview
+        </button>
+        <button id="themeToggleBtn" class="dashboard-theme-toggle" onclick="toggleTheme()">☀️ Light Mode</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- AI INTERVIEW BANNER -->
+      <div class="ai-banner">
+        <div class="ai-badge">🤖 NEW — AI INTERVIEW</div>
+        <div style="flex:1;">
+          <div style="font-size:14px; font-weight:700; color:var(--text);">Real AI Interview Simulator — like TCS, Infosys & Wipro AI Rounds</div>
+          <div style="font-size:12px; color:var(--muted2); margin-top:3px;">
+            Face verification → Voice + Text answers → AI feedback → Score report. Duration: 5–15 minutes.
+          </div>
+        </div>
+        <button onclick="startAIInterview()" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 3px 12px rgba(99,102,241,0.4);">
+          🚀 Begin AI Interview
+        </button>
+      </div>
+
+      <!-- FILTERS -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="section-header"><span class="section-title">🎯 Practice Mode</span></div>
+        <form method="GET" action="/interviews" style="display:flex; gap:12px; margin-top:14px; flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px;">
+            <label style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.05em;">JOB ROLE</label>
+            <select name="role" class="form-select" onchange="this.form.submit()">
+              {% for r in ['Backend Developer','Full Stack Engineer','Frontend Developer','Data Scientist','DevOps Engineer','ML Engineer'] %}
+                <option value="{{ r }}" {{ 'selected' if selected_role==r else '' }}>{{ r }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px;">
+            <label style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.05em;">COMPANY (PYQs)</label>
+            <select name="company" class="form-select" onchange="this.form.submit()">
+              {% for c in ['All Companies','Google','Amazon','Microsoft','Infosys','TCS','Wipro','Flipkart','Swiggy','Zomato','Accenture','Cognizant'] %}
+                <option value="{{ c }}" {{ 'selected' if selected_company==c else '' }}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;width:140px;">
+            <label style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.05em;">DIFFICULTY</label>
+            <select name="difficulty" class="form-select" onchange="this.form.submit()">
+              {% for d in ['All','Easy','Medium','Hard'] %}
+                <option value="{{ d }}" {{ 'selected' if selected_diff==d else '' }}>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <!-- STATS -->
+      <div class="stats-grid" style="margin-bottom:24px;">
+        <div class="stat-card indigo">
+          <div class="stat-top"><span class="stat-icon">📝</span><span class="stat-trend neutral">Total</span></div>
+          <div class="stat-value">{{ questions|length }}</div>
+          <div class="stat-label">Questions Available</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-top"><span class="stat-icon">✅</span><span class="stat-trend up">Done</span></div>
+          <div class="stat-value">{{ user.get("interview_practiced",0) }}</div>
+          <div class="stat-label">Questions Practiced</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-top"><span class="stat-icon">🏢</span></div>
+          <div class="stat-value" style="font-size:14px;line-height:1.4;">{{ selected_company if selected_company != 'All Companies' else 'All' }}</div>
+          <div class="stat-label">Company Filter</div>
+        </div>
+        <div class="stat-card pink">
+          <div class="stat-top"><span class="stat-icon">🔥</span><span class="stat-trend up">Streak</span></div>
+          <div class="stat-value">{{ user.get("streak",1) }}</div>
+          <div class="stat-label">Day Streak</div>
+        </div>
+      </div>
+
+      {% if selected_company != 'All Companies' %}
+      <div class="alert alert-info" style="margin-bottom:20px;">
+        🏢 Showing <strong>Previous Year Questions</strong> from <strong>{{ selected_company }}</strong> for {{ selected_role }}.
+      </div>
+      {% endif %}
+
+      <!-- QUESTION CARDS -->
+      <div class="section-header" style="margin-bottom:16px;">
+        <span class="section-title">🗂️ {{ questions|length }} Questions — {{ selected_role }}{% if selected_company != 'All Companies' %} @ {{ selected_company }}{% endif %}</span>
+        <span style="font-size:13px;color:var(--muted);">Click "Mock This" to practice individually</span>
+      </div>
+
+      {% for q in questions %}
+      <div class="interview-card" id="qcard{{ loop.index }}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="diff-badge diff-{{ q.difficulty.lower() }}">{{ q.difficulty }}</span>
+            <span style="font-size:12px;color:var(--accent2);font-weight:600;">{{ q.category }}</span>
+            {% if q.get('company') and q.company != 'All Companies' %}
+              <span style="font-size:11px;background:rgba(251,191,36,0.12);color:#fde68a;padding:3px 8px;border-radius:20px;font-weight:700;">🏢 {{ q.company }}</span>
+            {% endif %}
+            {% if q.get('year') %}
+              <span style="font-size:11px;color:var(--muted);font-weight:600;">📅 {{ q.year }}</span>
+            {% endif %}
+          </div>
+          <span style="font-size:12px;color:var(--muted);">Q{{ loop.index }}</span>
+        </div>
+        <div class="interview-question" style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:12px;">{{ q.question }}</div>
+        <div class="interview-answer" id="ans{{ loop.index }}">
+          <div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px;">💡 HINT / EXPECTED ANSWER</div>
+          {{ q.hint }}
+        </div>
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
+          <button class="reveal-btn" onclick="toggleAnswer({{ loop.index }}, this)">👁 Reveal Answer</button>
+          <form method="POST" action="/mark_practiced" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="question_id" value="{{ loop.index }}">
+            <button type="submit" class="btn-ghost" style="padding:6px 14px;font-size:13px;">✓ Mark Done</button>
+          </form>
+          <button class="btn-ghost" style="padding:6px 14px;font-size:13px;"
+            onclick="startSingleMock({{ loop.index }}, `{{ q.question|replace('`','') }}`, `{{ q.hint|replace('`','') }}`, `{{ q.difficulty }}`, `{{ q.category }}`)">
+            🎭 Mock This
+          </button>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">🎤</div>
+        <div class="empty-title">No Questions Found</div>
+        <div class="empty-text">Try a different role, company, or difficulty level</div>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- STEP 1: FACE VERIFICATION MODAL -->
+<!-- ====================================================== -->
+<div id="photoVerifyModal">
+  <div class="pv-box">
+    <div style="font-size:40px;margin-bottom:14px;">📸</div>
+    <h2>Face Verification Required</h2>
+    <p>Before your AI interview begins, we need to capture your photo to verify your identity throughout the session — just like real company AI interviews.</p>
+
+    <video id="pvVideo" autoplay playsinline muted></video>
+    <canvas id="pvCanvas"></canvas>
+    <img id="pvCapturedImg" alt="Your captured photo">
+
+    <div id="pvStatus" class="pv-status pending">📷 Camera initializing… please wait</div>
+
+    <div class="pv-actions">
+      <button id="pvCaptureBtn" onclick="capturePhoto()" style="display:none;background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">
+        📸 Take Photo
+      </button>
+      <button id="pvRetakeBtn" onclick="retakePhoto()" style="display:none;background:rgba(255,255,255,0.08);color:#94a3b8;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:12px 20px;font-size:13px;font-weight:600;cursor:pointer;">
+        🔄 Retake
+      </button>
+      <button id="pvProceedBtn" onclick="proceedToInterview()" style="display:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:white;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">
+        ✅ Looks Good — Start Interview
+      </button>
+      <button onclick="closePhotoModal()" style="background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer;padding:8px;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- STEP 2: AI INTERVIEW MODAL -->
+<!-- ====================================================== -->
+<div id="aiInterviewModal">
+
+  <!-- Header -->
+  <div class="ai-modal-header">
+    <div>
+      <div class="title">🤖 AI Interview Simulator</div>
+      <div class="subtitle">{{ selected_role }} · <span id="aiCompanyLabel">SkillHire AI Panel</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div id="aiSessionTimer" style="font-family:monospace;font-size:16px;font-weight:800;color:#22d3ee;">00:00</div>
+      <button onclick="endAIInterview()" style="background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.25);color:#f87171;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">⏹ End Session</button>
+    </div>
+  </div>
+
+  <div class="ai-modal-body">
+
+    <!-- LEFT: Camera Panel -->
+    <div class="ai-cam-panel">
+
+      <div style="font-size:11px;color:#6366f1;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Your Camera</div>
+
+      <div class="cam-frame">
+        <video id="aiCamVideo" autoplay playsinline muted></video>
+        <div class="cam-overlay"></div>
+        <div class="cam-dot"></div>
+      </div>
+
+      <!-- Reference photo -->
+      <div id="refPhotoContainer" style="display:none;">
+        <div class="ref-photo-frame">
+          <img id="refPhotoImg" alt="Reference">
+          <div class="rp-label">✓ Verified Identity</div>
+        </div>
+      </div>
+
+      <!-- Face match meter -->
+      <div class="face-match-box">
+        <div class="fm-label">🔍 FACE TRACKING</div>
+        <div id="faceMatchText" style="font-size:13px;color:#f1f5f9;font-weight:700;margin-bottom:6px;">Scanning...</div>
+        <div class="fm-bar-wrap"><div class="fm-bar" id="faceMatchBar" style="width:0%"></div></div>
+      </div>
+
+      <!-- Status indicators -->
+      <div class="ai-status-indicators">
+        <div class="status-row">
+          <div class="status-dot green" id="camDot"></div>
+          <span id="camStatus">Camera active</span>
+        </div>
+        <div class="status-row">
+          <div class="status-dot grey" id="micDot"></div>
+          <span id="micStatus">Microphone off</span>
+        </div>
+        <div class="status-row">
+          <div class="status-dot green" id="faceDot"></div>
+          <span id="faceStatus">Face detected ✓</span>
+        </div>
+        <div class="status-row">
+          <div class="status-dot yellow"></div>
+          <span>Proctoring active</span>
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:#475569;text-align:center;line-height:1.5;">
+        ⚠️ Please stay visible on camera at all times. Tab switching is monitored.
+      </div>
+    </div>
+
+    <!-- RIGHT: Interview Panel -->
+    <div class="ai-interview-panel">
+
+      <!-- Progress -->
+      <div class="ai-progress-bar">
+        <span class="prog-text">Q <span id="aiQNum">1</span> / <span id="aiQTotal">5</span></span>
+        <div class="prog-track"><div class="prog-fill" id="aiProgFill" style="width:0%"></div></div>
+        <div class="timer-badge" id="aiQTimer">02:00</div>
+      </div>
+
+      <!-- Question area -->
+      <div id="aiMainContent">
+
+        <!-- AI speaking box -->
+        <div class="ai-speaking-box">
+          <div class="ai-avatar-row">
+            <div class="ai-avatar">🤖</div>
+            <div>
+              <div class="ai-name">Aria — AI Interviewer</div>
+              <div class="ai-role">SkillHire Technical Panel</div>
+            </div>
+            <div class="ai-wave" id="aiWave">
+              <span style="height:6px"></span><span style="height:10px"></span>
+              <span style="height:14px"></span><span style="height:8px"></span><span style="height:5px"></span>
+            </div>
+          </div>
+          <div id="aiQuestionText" style="font-size:16px;font-weight:600;color:#f1f5f9;line-height:1.7;">
+            Loading your first question…
+          </div>
+          <div class="q-meta" id="qMeta"></div>
+        </div>
+
+        <!-- Answer area -->
+        <div class="answer-area">
+          <label>YOUR ANSWER — Speak or type below</label>
+          <textarea id="aiAnswerText" placeholder="Your answer will appear here as you speak, or type directly…" rows="5"></textarea>
+
+          <div class="voice-controls">
+            <button class="mic-btn idle" id="micToggleBtn" onclick="toggleMic()">
+              🎙 Start Speaking
+            </button>
+            <button class="hint-btn" onclick="showAIHint()">💡 Hint</button>
+            <button class="mic-btn idle" onclick="clearAnswer()" style="background:rgba(255,255,255,0.04);color:#64748b;">🗑 Clear</button>
+          </div>
+
+          <div id="aiHintBox"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="ai-actions">
+          <button class="ai-next-btn" id="aiNextBtn" onclick="nextAIQuestion()">
+            Next Question → <span id="aiNextLabel"></span>
+          </button>
+          <button class="ai-end-btn" onclick="endAIInterview()">⏹ End Early</button>
+        </div>
+
+      </div>
+
+      <!-- Results screen -->
+      <div id="aiResultsBox">
+        <div style="font-size:48px;margin-bottom:12px;">🎊</div>
+        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:#f1f5f9;margin-bottom:6px;">Interview Complete!</div>
+        <div style="font-size:14px;color:#94a3b8;margin-bottom:30px;">Here's your AI-generated performance report</div>
+
+        <div class="result-score-circle">
+          <div class="result-score-inner">
+            <div class="result-score-num" id="finalScoreNum">--</div>
+            <div class="result-score-label">SCORE</div>
+          </div>
+        </div>
+
+        <div class="feedback-grid">
+          <div class="fb-card">
+            <div class="fb-title">⏱ TIME TAKEN</div>
+            <div class="fb-val" id="fbTimeTaken">--</div>
+            <div class="fb-sub">Session duration</div>
+          </div>
+          <div class="fb-card">
+            <div class="fb-title">❓ QUESTIONS</div>
+            <div class="fb-val" id="fbQCount">--</div>
+            <div class="fb-sub">Total answered</div>
+          </div>
+          <div class="fb-card">
+            <div class="fb-title">🎙 VOICE</div>
+            <div class="fb-val" id="fbVoiceUsage">--</div>
+            <div class="fb-sub">Voice responses given</div>
+          </div>
+          <div class="fb-card">
+            <div class="fb-title">😊 FACE</div>
+            <div class="fb-val" id="fbFaceStatus">Verified ✓</div>
+            <div class="fb-sub">Identity maintained</div>
+          </div>
+        </div>
+
+        <div id="fbAdvice" style="margin-top:20px;padding:16px 20px;background:rgba(99,102,241,0.08);border-left:3px solid #6366f1;border-radius:0 10px 10px 0;font-size:13px;color:#c7d2fe;line-height:1.7;text-align:left;"></div>
+
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap;">
+          <button onclick="restartAIInterview()" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🔄 Retake Interview</button>
+          <button onclick="closeAIModal()" style="background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 20px;font-size:13px;font-weight:600;cursor:pointer;">✓ Done</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ─────────────────────────────────────────────────────────
+const allQuestions = {{ questions | tojson }};
+const selectedRole = "{{ selected_role }}";
+
+// ─── STATE ────────────────────────────────────────────────────────
+let pvStream = null;
+let aiStream = null;
+let capturedPhotoDataURL = null;
+let mockQuestions = [];
+let aiIndex = 0;
+let qTimerInterval = null;
+let sessionTimerInterval = null;
+let qTimeLeft = 120; // seconds per question
+let sessionSeconds = 0;
+let recognition = null;
+let isListening = false;
+let voiceUsed = 0;
+let faceCheckInterval = null;
+let faceMatchSimValue = 0;
+let tabWarnings = 0;
+
+// Track actual answers given for real AI feedback
+let answersLog = []; // [{question, answer, timeSpent, usedVoice}]
+let qStartTime = null;
+
+// ─── THEME & TAB TRACKING ─────────────────────────────────────────
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden && document.getElementById('aiInterviewModal').classList.contains('active')) {
+    tabWarnings++;
+    // Could alert the user; for now just log
+  }
+});
+
+// ─── REVEAL ANSWER (question bank) ────────────────────────────────
+function toggleAnswer(id, btn) {
+  const el = document.getElementById('ans' + id);
+  if (el.classList.contains('show')) {
+    el.classList.remove('show');
+    btn.textContent = '👁 Reveal Answer';
+  } else {
+    el.classList.add('show');
+    btn.textContent = '🙈 Hide Answer';
+  }
+}
+
+// ─── SINGLE MOCK (from question card) ─────────────────────────────
+function startSingleMock(idx, question, hint, diff, cat) {
+  const single = [{ question, hint, difficulty: diff, category: cat }];
+  launchPhotoVerify(single);
+}
+
+// ─── START AI INTERVIEW (full set) ────────────────────────────────
+function startAIInterview() {
+  // Select 5-10 questions
+  const shuffled = [...allQuestions].sort(() => Math.random() - 0.5);
+  const count = Math.min(Math.max(shuffled.length, 5), 10);
+  const qs = shuffled.slice(0, Math.min(count, shuffled.length));
+  if (qs.length === 0) {
+    alert('No questions available. Please select a role with questions.');
+    return;
+  }
+  launchPhotoVerify(qs);
+}
+
+// ─── PHOTO VERIFY ─────────────────────────────────────────────────
+function launchPhotoVerify(questions) {
+  mockQuestions = questions;
+  capturedPhotoDataURL = null;
+  document.getElementById('pvCapturedImg').style.display = 'none';
+  document.getElementById('pvVideo').style.display = 'block';
+  document.getElementById('pvCaptureBtn').style.display = 'none';
+  document.getElementById('pvRetakeBtn').style.display = 'none';
+  document.getElementById('pvProceedBtn').style.display = 'none';
+  setStatus('pvStatus', 'pending', '📷 Starting camera…');
+  document.getElementById('photoVerifyModal').classList.add('active');
+
+  navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 }, audio: false })
+    .then(function(stream) {
+      pvStream = stream;
+      const v = document.getElementById('pvVideo');
+      v.srcObject = stream;
+      v.play();
+      setStatus('pvStatus', 'pending', '😊 Position your face in the center and click Capture');
+      document.getElementById('pvCaptureBtn').style.display = 'inline-block';
+    })
+    .catch(function(err) {
+      setStatus('pvStatus', 'error', '❌ Camera access denied. Please allow camera and reload.');
+    });
+}
+
+function capturePhoto() {
+  const v = document.getElementById('pvVideo');
+  const canvas = document.getElementById('pvCanvas');
+  canvas.width = v.videoWidth;
+  canvas.height = v.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(-1, 1); // mirror correction
+  ctx.drawImage(v, -canvas.width, 0);
+  capturedPhotoDataURL = canvas.toDataURL('image/jpeg', 0.85);
+
+  document.getElementById('pvVideo').style.display = 'none';
+  const img = document.getElementById('pvCapturedImg');
+  img.src = capturedPhotoDataURL;
+  img.style.display = 'block';
+
+  setStatus('pvStatus', 'success', '✅ Photo captured! Does this look clear and well-lit?');
+  document.getElementById('pvCaptureBtn').style.display = 'none';
+  document.getElementById('pvRetakeBtn').style.display = 'inline-block';
+  document.getElementById('pvProceedBtn').style.display = 'inline-block';
+}
+
+function retakePhoto() {
+  document.getElementById('pvCapturedImg').style.display = 'none';
+  document.getElementById('pvVideo').style.display = 'block';
+  document.getElementById('pvRetakeBtn').style.display = 'none';
+  document.getElementById('pvProceedBtn').style.display = 'none';
+  document.getElementById('pvCaptureBtn').style.display = 'inline-block';
+  setStatus('pvStatus', 'pending', '😊 Position your face and capture again');
+}
+
+function proceedToInterview() {
+  // Stop PV camera, start AI interview
+  if (pvStream) { pvStream.getTracks().forEach(t => t.stop()); pvStream = null; }
+  document.getElementById('photoVerifyModal').classList.remove('active');
+  openAIInterviewModal();
+}
+
+function closePhotoModal() {
+  if (pvStream) { pvStream.getTracks().forEach(t => t.stop()); pvStream = null; }
+  document.getElementById('photoVerifyModal').classList.remove('active');
+}
+
+function setStatus(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className = 'pv-status ' + type;
+  el.textContent = msg;
+}
+
+// ─── AI INTERVIEW MODAL ────────────────────────────────────────────
+function openAIInterviewModal() {
+  aiIndex = 0;
+  sessionSeconds = 0;
+  voiceUsed = 0;
+  answersLog = [];
+  qStartTime = null;
+  document.getElementById('aiQTotal').textContent = mockQuestions.length;
+  document.getElementById('aiResultsBox').style.display = 'none';
+  document.getElementById('aiMainContent').style.display = 'block';
+  document.getElementById('aiInterviewModal').classList.add('active');
+
+  // Show reference photo
+  if (capturedPhotoDataURL) {
+    document.getElementById('refPhotoImg').src = capturedPhotoDataURL;
+    document.getElementById('refPhotoContainer').style.display = 'block';
+  }
+
+  // Start camera for interview
+  navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: true })
+    .then(function(stream) {
+      aiStream = stream;
+      const v = document.getElementById('aiCamVideo');
+      v.srcObject = stream;
+      v.play();
+    }).catch(function() {
+      document.getElementById('camStatus').textContent = 'Camera unavailable';
+      document.getElementById('camDot').className = 'status-dot red';
+    });
+
+  // Session timer
+  sessionTimerInterval = setInterval(function() {
+    sessionSeconds++;
+    const m = String(Math.floor(sessionSeconds / 60)).padStart(2,'0');
+    const s = String(sessionSeconds % 60).padStart(2,'0');
+    document.getElementById('aiSessionTimer').textContent = m + ':' + s;
+  }, 1000);
+
+  // Face tracking simulation
+  startFaceTracking();
+
+  // Init speech
+  initSpeechRecognition();
+
+  // Load first question
+  loadAIQuestion();
+}
+
+function startFaceTracking() {
+  faceMatchSimValue = 70 + Math.random() * 20;
+  faceCheckInterval = setInterval(function() {
+    // Simulate realistic face match fluctuation
+    faceMatchSimValue += (Math.random() - 0.45) * 5;
+    faceMatchSimValue = Math.max(55, Math.min(98, faceMatchSimValue));
+    const pct = Math.round(faceMatchSimValue);
+    document.getElementById('faceMatchBar').style.width = pct + '%';
+    if (pct >= 75) {
+      document.getElementById('faceMatchText').textContent = 'Face Match: ' + pct + '% ✓';
+      document.getElementById('faceDot').className = 'status-dot green';
+      document.getElementById('faceStatus').textContent = 'Face detected ✓';
+    } else {
+      document.getElementById('faceMatchText').textContent = 'Low match: ' + pct + '% — adjust lighting';
+      document.getElementById('faceDot').className = 'status-dot yellow';
+      document.getElementById('faceStatus').textContent = 'Poor lighting ⚠️';
+    }
+  }, 1500);
+}
+
+function loadAIQuestion() {
+  if (aiIndex >= mockQuestions.length) { endAIInterview(); return; }
+  const q = mockQuestions[aiIndex];
+  
+  // Update progress
+  document.getElementById('aiQNum').textContent = aiIndex + 1;
+  const pct = ((aiIndex) / mockQuestions.length) * 100;
+  document.getElementById('aiProgFill').style.width = pct + '%';
+  
+  // Update next button label
+  const nextLabel = aiIndex === mockQuestions.length - 1 ? '(Final Question)' : '';
+  document.getElementById('aiNextLabel').textContent = nextLabel;
+
+  // Clear answer
+  document.getElementById('aiAnswerText').value = '';
+  document.getElementById('aiAnswerText').classList.remove('listening');
+  document.getElementById('aiHintBox').style.display = 'none';
+
+  // Typing effect for question
+  const qEl = document.getElementById('aiQuestionText');
+  qEl.textContent = '';
+  let i = 0;
+  const text = q.question;
+  const typeInterval = setInterval(function() {
+    qEl.textContent += text[i];
+    i++;
+    if (i >= text.length) clearInterval(typeInterval);
+  }, 22);
+
+  // Question meta tags
+  const meta = document.getElementById('qMeta');
+  meta.innerHTML = `
+    <span class="q-tag diff-${(q.difficulty||'medium').toLowerCase()}">${q.difficulty || 'Medium'}</span>
+    <span class="q-tag cat">${q.category || 'Technical'}</span>
+    ${q.company && q.company !== 'All Companies' ? `<span class="q-tag cat">🏢 ${q.company}</span>` : ''}
+  `;
+
+  // TTS: AI reads the question aloud
+  speakQuestion(q.question);
+  qStartTime = Date.now();
+
+  // Per-question timer (2 min default, can be extended)
+  clearInterval(qTimerInterval);
+  qTimeLeft = 120;
+  updateQTimerDisplay();
+  qTimerInterval = setInterval(function() {
+    qTimeLeft--;
+    updateQTimerDisplay();
+    if (qTimeLeft <= 0) {
+      clearInterval(qTimerInterval);
+      // Auto-advance
+      nextAIQuestion();
+    }
+  }, 1000);
+}
+
+function updateQTimerDisplay() {
+  const m = String(Math.floor(qTimeLeft / 60)).padStart(2,'0');
+  const s = String(qTimeLeft % 60).padStart(2,'0');
+  const el = document.getElementById('aiQTimer');
+  el.textContent = m + ':' + s;
+  el.className = 'timer-badge' + (qTimeLeft <= 30 ? ' urgent' : '');
+}
+
+function speakQuestion(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const wave = document.getElementById('aiWave');
+  wave.style.display = 'flex';
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 0.92;
+  utt.pitch = 1.05;
+  // Try to get a nice voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'));
+  if (preferred) utt.voice = preferred;
+  utt.onend = function() { wave.style.display = 'none'; };
+  window.speechSynthesis.speak(utt);
+}
+
+function nextAIQuestion() {
+  clearInterval(qTimerInterval);
+  stopMic();
+
+  // Always log this question (even if blank answer)
+  const answerEl = document.getElementById('aiAnswerText');
+  const answer = (answerEl ? answerEl.value.trim() : '') || '[No answer given - skipped]';
+  const timeSpent = qStartTime ? Math.round((Date.now() - qStartTime) / 1000) : 120;
+
+  if (aiIndex < mockQuestions.length) {
+    answersLog.push({
+      question: mockQuestions[aiIndex].question,
+      category: mockQuestions[aiIndex].category || 'Technical',
+      difficulty: mockQuestions[aiIndex].difficulty || 'Medium',
+      answer: answer,
+      timeSpent: timeSpent
+    });
+  }
+
+  aiIndex++;
+  if (aiIndex >= mockQuestions.length) {
+    endAIInterview();
+  } else {
+    loadAIQuestion();
+  }
+}
+
+function endAIInterview() {
+  clearInterval(qTimerInterval);
+  clearInterval(sessionTimerInterval);
+  clearInterval(faceCheckInterval);
+  stopMic();
+  window.speechSynthesis && window.speechSynthesis.cancel();
+
+  // Capture the current question's answer before ending
+  const answerEl = document.getElementById('aiAnswerText');
+  const answer = answerEl ? answerEl.value.trim() : '';
+  const timeSpent = qStartTime ? Math.round((Date.now() - qStartTime) / 1000) : 0;
+
+  if (aiIndex < mockQuestions.length) {
+    answersLog.push({
+      question: mockQuestions[aiIndex].question,
+      category: mockQuestions[aiIndex].category || 'Technical',
+      difficulty: mockQuestions[aiIndex].difficulty || 'Medium',
+      answer: answer || '[No answer given - ended early]',
+      timeSpent: timeSpent
+    });
+  }
+
+  showResults();
+}
+
+async function showResults() {
+  document.getElementById('aiMainContent').style.display = 'none';
+  document.getElementById('aiResultsBox').style.display = 'block';
+
+  const mStr = String(Math.floor(sessionSeconds / 60)).padStart(2,'0');
+  const sStr = String(sessionSeconds % 60).padStart(2,'0');
+  const sessionTimeStr = mStr + ':' + sStr;
+
+  // Show loading state immediately
+  document.getElementById('finalScoreNum').textContent = '...';
+  document.getElementById('fbFaceStatus').textContent = 'Verified ✓';
+  document.getElementById('fbTimeTaken').textContent = sessionTimeStr;
+  document.getElementById('fbQCount').textContent = answersLog.length + ' / ' + mockQuestions.length;
+  document.getElementById('fbVoiceUsage').textContent = voiceUsed + ' questions';
+  document.getElementById('fbAdvice').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;padding:4px 0;">
+      <div style="width:22px;height:22px;border:3px solid #6366f1;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>
+      <span style="color:#a5b4fc;font-size:14px;">🤖 AI is analyzing your interview performance... this takes ~10 seconds</span>
+    </div>`;
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+  // Mark practiced (fire and forget)
+  fetch('/mark_practiced_ajax', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+    body: JSON.stringify({count: answersLog.length})
+  });
+
+  try {
+    // Call our Flask backend proxy (keeps API key server-side)
+    const response = await fetch('/ai_feedback', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+      body: JSON.stringify({
+        answersLog: answersLog,
+        selectedRole: selectedRole,
+        sessionTime: sessionTimeStr,
+        voiceUsed: voiceUsed,
+        tabWarnings: tabWarnings,
+        totalQuestions: mockQuestions.length
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      if (data.no_key) {
+        throw new Error('NO_KEY');
+      }
+
+      throw new Error(data.error || 'Server error');
+    }
+
+    const feedback = data.feedback;
+    const score = Math.min(100, Math.max(0, feedback.score || 0));
+    document.getElementById('finalScoreNum').textContent = score + '%';
+
+    const circle = document.querySelector('.result-score-circle');
+    const color = score >= 80 ? '#22d3ee' : score >= 60 ? '#fbbf24' : '#f87171';
+    circle.style.background = `conic-gradient(#6366f1 0%, ${color} ${score}%, rgba(255,255,255,0.05) ${score}%)`;
+
+    const mistakes     = Array.isArray(feedback.mistakes)     ? feedback.mistakes     : [];
+    const strengths    = Array.isArray(feedback.strengths)    ? feedback.strengths    : [];
+    const improvements = Array.isArray(feedback.improvements) ? feedback.improvements : [];
+    const summary      = feedback.summary  || 'Interview session completed.';
+    const top_tip      = feedback.top_tip  || '';
+
+    const mistakesList  = mistakes.map(m    => `<li style="margin-bottom:8px;padding:6px 10px;background:rgba(248,113,113,0.06);border-radius:6px;">❌ ${m}</li>`).join('');
+    const strengthsList = strengths.map(s   => `<li style="margin-bottom:8px;padding:6px 10px;background:rgba(52,211,153,0.06);border-radius:6px;">✅ ${s}</li>`).join('');
+    const improvList    = improvements.map(i => `<li style="margin-bottom:8px;padding:6px 10px;background:rgba(129,140,248,0.06);border-radius:6px;">📌 ${i}</li>`).join('');
+
+    let html = '';
+    html += `<div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.07);">`;
+    html += `<div style="font-size:11px;font-weight:800;color:#94a3b8;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;">🤖 AI ASSESSMENT</div>`;
+    html += `<div style="font-size:14px;line-height:1.75;color:#c7d2fe;">${summary}</div></div>`;
+    if (mistakesList) {
+      html += `<div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:800;color:#f87171;letter-spacing:0.06em;margin-bottom:8px;">⚠️ MISTAKES DETECTED</div><ul style="list-style:none;padding:0;font-size:13px;color:#fca5a5;">${mistakesList}</ul></div>`;
+    }
+    if (strengthsList) {
+      html += `<div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:800;color:#34d399;letter-spacing:0.06em;margin-bottom:8px;">💪 YOUR STRENGTHS</div><ul style="list-style:none;padding:0;font-size:13px;color:#6ee7b7;">${strengthsList}</ul></div>`;
+    }
+    if (improvList) {
+      html += `<div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:800;color:#818cf8;letter-spacing:0.06em;margin-bottom:8px;">🎯 HOW TO IMPROVE</div><ul style="list-style:none;padding:0;font-size:13px;color:#a5b4fc;">${improvList}</ul></div>`;
+    }
+    if (top_tip) {
+      html += `<div style="padding:14px 16px;background:rgba(99,102,241,0.1);border-left:3px solid #6366f1;border-radius:0 10px 10px 0;margin-bottom:12px;"><div style="font-size:11px;font-weight:800;color:#818cf8;margin-bottom:5px;letter-spacing:0.05em;">🏆 TOP PRIORITY TO WORK ON</div><div style="font-size:13px;color:#c7d2fe;line-height:1.6;">${top_tip}</div></div>`;
+    }
+    html += `<div style="font-size:11px;color:#475569;text-align:right;margin-top:8px;">Powered by Google Gemini ✦ Free AI</div>`;
+    document.getElementById('fbAdvice').innerHTML = html;
+
+  } catch(err) {
+    console.error('AI feedback error:', err);
+    const answeredCount2 = answersLog.filter(a => a.answer && !a.answer.includes('[No answer given')).length;
+
+    let errMsg = '';
+    if (err.message === 'NO_KEY') {
+      errMsg = `<div style="margin-bottom:10px;font-weight:700;color:#fbbf24;">⚙️ Setup Required</div>
+        <div style="font-size:13px;line-height:1.7;color:#94a3b8;">Your server needs a <code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;">GEMINI_API_KEY</code> environment variable to enable AI feedback.<br><br>
+        Get a free key at <strong style="color:#818cf8;">aistudio.google.com</strong> → then set it:<br>
+        <code style="display:block;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:6px;margin-top:8px;font-size:12px;">export GEMINI_API_KEY=AIza...</code>
+        <code style="display:block;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:6px;margin-top:6px;font-size:12px;">python app.py</code></div>`;
+    } else {
+      errMsg = `<div style="font-size:13px;color:#94a3b8;line-height:1.7;">
+        Could not get AI feedback: <span style="color:#f87171;">${err.message}</span><br><br>
+        <strong style="color:#f1f5f9;">Your session stats:</strong> You answered ${answeredCount2} of ${mockQuestions.length} questions in ${sessionTimeStr}.
+        ${answeredCount2 === 0 ? '<br><br><span style="color:#fbbf24;">⚠️ No answers were recorded — make sure to type or speak your answers before clicking Next.</span>' : ''}
+      </div>`;
+    }
+
+    // Still show a basic score based on completion %
+    const basicScore = answeredCount2 === 0 ? 0 : Math.round((answeredCount2 / Math.max(mockQuestions.length, 1)) * 65 + Math.min(voiceUsed * 3, 20));
+    document.getElementById('finalScoreNum').textContent = basicScore + '%';
+    const circle2 = document.querySelector('.result-score-circle');
+    circle2.style.background = `conic-gradient(#6366f1 0%, #fbbf24 ${basicScore}%, rgba(255,255,255,0.05) ${basicScore}%)`;
+    document.getElementById('fbAdvice').innerHTML = errMsg;
+  }
+}
+
+function restartAIInterview() {
+  aiIndex = 0;
+  sessionSeconds = 0;
+  voiceUsed = 0;
+  answersLog = [];
+  qStartTime = null;
+  document.getElementById('aiResultsBox').style.display = 'none';
+  document.getElementById('aiMainContent').style.display = 'block';
+  // Shuffle questions again
+  mockQuestions = [...mockQuestions].sort(() => Math.random() - 0.5);
+  clearInterval(sessionTimerInterval);
+  sessionTimerInterval = setInterval(function() {
+    sessionSeconds++;
+    const m = String(Math.floor(sessionSeconds / 60)).padStart(2,'0');
+    const s = String(sessionSeconds % 60).padStart(2,'0');
+    document.getElementById('aiSessionTimer').textContent = m + ':' + s;
+  }, 1000);
+  loadAIQuestion();
+}
+
+function closeAIModal() {
+  clearAll();
+  document.getElementById('aiInterviewModal').classList.remove('active');
+  location.reload();
+}
+
+function clearAll() {
+  clearInterval(qTimerInterval);
+  clearInterval(sessionTimerInterval);
+  clearInterval(faceCheckInterval);
+  stopMic();
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  if (aiStream) { aiStream.getTracks().forEach(t => t.stop()); aiStream = null; }
+}
+
+// ─── VOICE RECOGNITION ────────────────────────────────────────────
+function initSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    document.getElementById('micToggleBtn').textContent = '🎙 Voice not supported — type instead';
+    document.getElementById('micToggleBtn').disabled = true;
+    return;
+  }
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-IN';
+
+  recognition.onstart = function() {
+    isListening = true;
+    const btn = document.getElementById('micToggleBtn');
+    btn.textContent = '🛑 Stop Speaking';
+    btn.className = 'mic-btn active';
+    document.getElementById('aiAnswerText').classList.add('listening');
+    document.getElementById('micDot').className = 'status-dot green';
+    document.getElementById('micStatus').textContent = 'Listening…';
+  };
+
+  recognition.onresult = function(e) {
+    let transcript = '';
+    for (let i = 0; i < e.results.length; i++) {
+      transcript += e.results[i][0].transcript;
+    }
+    document.getElementById('aiAnswerText').value = transcript;
+  };
+
+  recognition.onend = function() {
+    if (isListening) {
+      // Restart if we didn't manually stop
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+
+  recognition.onerror = function(e) {
+    if (e.error === 'not-allowed') {
+      const btn = document.getElementById('micToggleBtn');
+      btn.textContent = '🎙 Mic blocked — type instead';
+      btn.className = 'mic-btn no-speech';
+    }
+  };
+}
+
+function toggleMic() {
+  if (!recognition) return;
+  if (isListening) {
+    stopMic();
+  } else {
+    voiceUsed++;
+    recognition.start();
+  }
+}
+
+function stopMic() {
+  if (recognition && isListening) {
+    isListening = false;
+    try { recognition.stop(); } catch(e) {}
+  }
+  const btn = document.getElementById('micToggleBtn');
+  if (btn) {
+    btn.textContent = '🎙 Start Speaking';
+    btn.className = 'mic-btn idle';
+  }
+  const ta = document.getElementById('aiAnswerText');
+  if (ta) ta.classList.remove('listening');
+  const dot = document.getElementById('micDot');
+  if (dot) { dot.className = 'status-dot grey'; document.getElementById('micStatus').textContent = 'Microphone off'; }
+}
+
+function showAIHint() {
+  if (aiIndex >= mockQuestions.length) return;
+  const hintBox = document.getElementById('aiHintBox');
+  hintBox.innerHTML = '💡 <strong>Hint:</strong> ' + mockQuestions[aiIndex].hint;
+  hintBox.style.display = 'block';
+}
+
+function clearAnswer() {
+  document.getElementById('aiAnswerText').value = '';
+}
+</script>
+</body>
+</html>

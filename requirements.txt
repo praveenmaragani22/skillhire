@@ -28,3 +28,4 @@ dnspython==2.6.1
 
 # Optional: load environment variables from .env file
 python-dotenv==1.0.1
+gunicorn==23.0.0
